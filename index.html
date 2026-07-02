@@ -6,6 +6,7 @@
 <title>見積AI帳場 | Hearts House Inc.</title>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -116,7 +117,7 @@
   label.field-label{
     display:block; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin:10px 0 5px; letter-spacing:.03em;
   }
-  textarea, input[type=text], input[type=number], select{
+  textarea, input[type=text], input[type=number], input[type=email], input[type=password], select{
     width:100%; padding:10px; border:1px solid #D8D2C4; border-radius:2px;
     font-family:inherit; font-size:14px; background:#FCFBF7; color:var(--ink);
   }
@@ -172,6 +173,7 @@
   .price-src.master{background:#E3EEE3; color:var(--green);}
   .price-src.ai{background:#F3E6D8; color:var(--amber-deep);}
   .price-src.manual{background:#E5E9F0; color:var(--blue);}
+  .price-src.catalog{background:#EAF3EC; color:#2E7D46;}
 
   .totals{margin-top:14px; border-top:2px solid var(--ink); padding-top:10px;}
   .totals .row{display:flex; justify-content:space-between; padding:3px 0; font-size:13.5px;}
@@ -213,6 +215,60 @@
   .loading{display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg)}}
 
+  .mfr-row{display:grid; grid-template-columns:1fr 70px 44px; gap:6px; align-items:center; padding:7px 0; border-bottom:1px solid var(--paper-line); font-size:13px;}
+  .mfr-row.head{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-soft); border-bottom:2px solid var(--ink);}
+  .mfr-row .del{background:none; border:none; color:var(--red); cursor:pointer; font-size:16px;}
+
+  .auth-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-card{
+    width:100%; max-width:380px; background:var(--card); border:1px solid var(--paper-line);
+    border-radius:2px; padding:26px 22px; box-shadow:0 2px 10px rgba(22,35,58,.08);
+  }
+  .auth-logo{font-family:'Shippori Mincho',serif; font-size:22px; font-weight:800; text-align:center; color:var(--blue-deep);}
+  .auth-tagline{text-align:center; font-size:11.5px; color:var(--ink-soft); margin:2px 0 18px;}
+  .auth-tabs{display:flex; gap:6px; margin-bottom:16px;}
+  .auth-tab{
+    flex:1; text-align:center; padding:9px 4px; font-size:12.5px; font-weight:700;
+    border:1px solid #D8D2C4; background:#FCFBF7; cursor:pointer; color:var(--ink-soft);
+  }
+  .auth-tab.on{background:var(--blue-deep); color:#fff; border-color:var(--blue-deep);}
+  .auth-err{color:var(--red); font-size:12px; min-height:16px; margin-top:6px;}
+
+  .uitem{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-line);}
+  .uitem .un{font-size:13.5px; font-weight:700;}
+  .uitem .ue{font-size:11.5px; color:var(--ink-soft);}
+  .badge-admin{background:#F3E6D8; color:var(--amber-deep); font-size:10px; padding:1px 5px; border-radius:2px; margin-left:4px;}
+  .badge-hidden{background:#E5E9F0; color:var(--ink-soft); font-size:10px; padding:1px 5px; border-radius:2px; margin-left:4px;}
+
+  .picker-modal{
+    position:fixed; inset:0; background:rgba(22,35,58,.55); z-index:200;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .picker-modal-inner{
+    background:var(--paper); width:100%; max-width:520px; max-height:82vh;
+    border-radius:8px 8px 0 0; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .picker-modal-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:12px 14px; border-bottom:1px solid var(--paper-line); font-weight:800; font-size:14px;
+  }
+  #pickerModalBody{overflow-y:auto; padding:12px 14px;}
+  .picker-chip-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .picker-chip{
+    padding:10px 14px; border:1px solid #D8D2C4; background:#FCFBF7; border-radius:20px;
+    font-size:13px; font-weight:700; color:var(--ink); cursor:pointer;
+  }
+  .picker-chip .cnt{color:var(--ink-soft); font-weight:400; font-size:11px; margin-left:4px;}
+  .picker-item-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:10px 4px; border-bottom:1px solid var(--paper-line); cursor:pointer;
+  }
+  .picker-item-row .name{font-size:13.5px; font-weight:700;}
+  .picker-item-row .grade{font-size:11.5px; color:var(--ink-soft);}
+  .picker-item-row .price{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--blue-deep);}
+
   @media print{
     header.top, .steps, .btn-row, .no-print{display:none !important;}
     body{background:#fff; padding:0;}
@@ -223,10 +279,45 @@
 </head>
 <body>
 
+<div id="authScreen" class="auth-screen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-logo">見積AI帳場</div>
+    <div class="auth-tagline">HEARTS HOUSE INC. / 現場帳場</div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="atab-li" onclick="authTab('li')">ログイン</button>
+      <button class="auth-tab" id="atab-reg" onclick="authTab('reg')">新規登録</button>
+    </div>
+    <div id="aform-li">
+      <label class="field-label">メールアドレス</label>
+      <input type="email" id="li-email" placeholder="example@email.com">
+      <label class="field-label">パスワード</label>
+      <input type="password" id="li-pass" placeholder="パスワード">
+      <div class="auth-err" id="li-err"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:6px;" onclick="doLogin()">ログイン</button>
+    </div>
+    <div id="aform-reg" style="display:none;">
+      <label class="field-label">お名前</label>
+      <input type="text" id="reg-name" placeholder="山田 太郎">
+      <label class="field-label">メールアドレス</label>
+      <input type="email" id="reg-email" placeholder="example@email.com">
+      <label class="field-label">パスワード（6文字以上）</label>
+      <input type="password" id="reg-pass" placeholder="パスワード">
+      <div class="auth-err" id="reg-err"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:6px;" onclick="doRegister()">登録する</button>
+    </div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
 <header class="top">
   <div class="eyebrow">HEARTS HOUSE INC. / 現場帳場</div>
   <h1>見積AI帳場</h1>
   <p>依頼を解析し、単価をあて、見積書に仕立てる</p>
+  <div class="no-print" style="position:absolute; top:16px; right:16px; display:flex; gap:6px;">
+    <button class="btn btn-ghost" id="adminBtn" style="display:none; padding:7px 10px; font-size:12px;" onclick="openAdminModal()">⚙️ 管理</button>
+    <button class="btn btn-ghost" style="padding:7px 10px; font-size:12px;" onclick="doLogout()">ログアウト</button>
+  </div>
 </header>
 
 <nav class="steps no-print" id="steps">
@@ -235,6 +326,7 @@
   <button class="step-btn" data-panel="output"><span class="num">03</span><span class="label">単価・出力</span></button>
   <button class="step-btn" data-panel="master"><span class="num">04</span><span class="label">単価表</span></button>
   <button class="step-btn" data-panel="templates"><span class="num">05</span><span class="label">書式管理</span></button>
+  <button class="step-btn" data-panel="manufacturers"><span class="num">06</span><span class="label">メーカー単価表</span></button>
 </nav>
 
 <main>
@@ -363,9 +455,61 @@
         <button class="btn btn-outline btn-full" id="addTemplateBtn">＋ 書式を追加</button>
       </div>
     </div>
+    <div class="card">
+      <h2><span class="tag">読込</span>既存Excel見積書をアップロードして書式を取り込む</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">御社の実際の見積書Excelを読み込み、タイトル行・列見出しから書式を自動作成します。</p>
+      <input type="file" id="templateExcelInput" accept=".xlsx,.xls,.csv">
+      <div id="templateImportStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
+    </div>
+  </section>
+
+  <!-- 06 メーカー単価表 -->
+  <section class="panel" id="panel-manufacturers">
+    <div class="card">
+      <h2><span class="tag">06</span>メーカー単価表を取り込む</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">メーカーごとの単価表（Excel）をアップロードすると、AIが品目をジャンル分けします。見積明細で「単価表から選ぶ」から段階的に絞り込んで単価をあてられます。</p>
+      <label class="field-label">メーカー名</label>
+      <input type="text" id="mfrNameInput" placeholder="例）LIXIL、TOTO、パナソニック">
+      <label class="field-label" style="margin-top:10px;">単価表（Excel）</label>
+      <input type="file" id="mfrExcelInput" accept=".xlsx,.xls,.csv">
+      <div id="mfrImportStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
+    </div>
+    <div class="card">
+      <h2><span class="tag">一覧</span>登録済みメーカー単価表</h2>
+      <div id="mfrList"></div>
+    </div>
   </section>
 
 </main>
+
+</div><!-- /appRoot -->
+
+<div class="picker-modal" id="adminModal" style="display:none;">
+  <div class="picker-modal-inner">
+    <div class="picker-modal-head">
+      <span>⚙️ ユーザー管理</span>
+      <button class="btn btn-ghost" id="adminCloseBtn">✕</button>
+    </div>
+    <div style="padding:0 14px;">
+      <div class="input-mode-row" style="margin-top:12px;">
+        <div class="mode-chip active" id="uatab-active" onclick="switchAdminTab('active')">表示中</div>
+        <div class="mode-chip" id="uatab-hidden" onclick="switchAdminTab('hidden')">非表示</div>
+      </div>
+    </div>
+    <div id="pickerAdminBody" style="overflow-y:auto; padding:4px 14px 14px;"></div>
+  </div>
+</div>
+
+<div class="picker-modal" id="pickerModal" style="display:none;">
+  <div class="picker-modal-inner">
+    <div class="picker-modal-head">
+      <span id="pickerModalTitle">単価表から選ぶ</span>
+      <button class="btn btn-ghost" id="pickerBackBtn" style="display:none;">← 戻る</button>
+      <button class="btn btn-ghost" id="pickerCloseBtn">✕</button>
+    </div>
+    <div id="pickerModalBody"></div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -376,28 +520,183 @@
    プロジェクトID候補: kensetsu-nippo-842a2
 ========================================================= */
 const firebaseConfig = {
-  apiKey: "",
+  apiKey: "AIzaSyCVk2miG5TK1ffTofXLh0hHgeSbOvmIgZ8",
   authDomain: "kensetsu-nippo-842a2.firebaseapp.com",
   projectId: "kensetsu-nippo-842a2",
-  storageBucket: "kensetsu-nippo-842a2.appspot.com",
-  messagingSenderId: "",
-  appId: ""
+  storageBucket: "kensetsu-nippo-842a2.firebasestorage.app",
+  messagingSenderId: "702880974315",
+  appId: "1:702880974315:web:985321dc9180046629c5ae"
 };
 
 const ASK_AI_ENDPOINT = "https://us-central1-kensetsu-nippo-842a2.cloudfunctions.net/askAI";
 const ACCESS_KEY = "HeartsHouse2026Key";
 
 let db = null;
+let auth = null;
 try{
   if(firebaseConfig.apiKey){
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    auth = firebase.auth();
   } else {
     document.getElementById('configWarn').style.display = 'block';
   }
 }catch(e){
   console.error('Firebase init error', e);
   document.getElementById('configWarn').style.display = 'block';
+}
+
+/* ========================= 認証 ========================= */
+let currentUser = null;
+let currentUserIsAdmin = false;
+
+function authTab(t){
+  document.getElementById('aform-li').style.display = t==='li' ? 'block' : 'none';
+  document.getElementById('aform-reg').style.display = t==='reg' ? 'block' : 'none';
+  document.getElementById('atab-li').classList.toggle('on', t==='li');
+  document.getElementById('atab-reg').classList.toggle('on', t==='reg');
+}
+
+function authErrMsg(code){
+  const m = {
+    'auth/user-not-found':'ユーザーが見つかりません',
+    'auth/wrong-password':'パスワードが間違っています',
+    'auth/invalid-email':'メールアドレスが無効です',
+    'auth/email-already-in-use':'このメールアドレスは既に登録されています',
+    'auth/invalid-credential':'メールまたはパスワードが間違っています',
+    'auth/too-many-requests':'しばらく待ってから再試行してください'
+  };
+  return m[code] || (code || 'エラーが発生しました');
+}
+
+async function doLogin(){
+  const email = document.getElementById('li-email').value.trim();
+  const pass = document.getElementById('li-pass').value;
+  const err = document.getElementById('li-err');
+  err.textContent = '';
+  if(!email || !pass){ err.textContent = 'メールアドレスとパスワードを入力してください'; return; }
+  if(!auth){ err.textContent = 'Firebase未設定です'; return; }
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(e){
+    err.textContent = authErrMsg(e.code);
+  }
+}
+
+async function doRegister(){
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const err = document.getElementById('reg-err');
+  err.textContent = '';
+  if(!name || !email || !pass){ err.textContent = 'すべての項目を入力してください'; return; }
+  if(pass.length<6){ err.textContent = 'パスワードは6文字以上にしてください'; return; }
+  if(!auth){ err.textContent = 'Firebase未設定です'; return; }
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await db.collection('mitsumori_users').doc(cred.user.uid).set({
+      name, email, isAdmin:false, hidden:false, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){
+    err.textContent = authErrMsg(e.code);
+  }
+}
+
+async function doLogout(){
+  if(!confirm('ログアウトしますか？')) return;
+  await auth.signOut();
+}
+
+async function loadMyUserDoc(uid, user){
+  const ref = db.collection('mitsumori_users').doc(uid);
+  const snap = await ref.get();
+  if(snap.exists) return snap.data();
+  const d = { name:user.email.split('@')[0], email:user.email, isAdmin:false, hidden:false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+  await ref.set(d);
+  return d;
+}
+
+function bootAppAfterAuth(){
+  (async ()=>{
+    await loadTemplates();
+    renderTemplateList();
+    renderMasterList();
+    renderMfrList();
+  })();
+}
+
+if(auth){
+  auth.onAuthStateChanged(async (user)=>{
+    if(user){
+      currentUser = user;
+      const profile = await loadMyUserDoc(user.uid, user);
+      currentUserIsAdmin = !!profile.isAdmin;
+      document.getElementById('adminBtn').style.display = currentUserIsAdmin ? '' : 'none';
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('appRoot').style.display = 'block';
+      bootAppAfterAuth();
+    } else {
+      currentUser = null;
+      currentUserIsAdmin = false;
+      document.getElementById('authScreen').style.display = 'flex';
+      document.getElementById('appRoot').style.display = 'none';
+    }
+  });
+} else {
+  // Firebase未設定：ログイン不要でそのままアプリを使わせる（既存の graceful degradation を維持）
+  document.getElementById('appRoot').style.display = 'block';
+  bootAppAfterAuth();
+}
+
+/* ========================= 管理者パネル ========================= */
+let _adminTab = 'active';
+function openAdminModal(){
+  document.getElementById('adminModal').style.display = 'flex';
+  switchAdminTab('active');
+}
+function closeAdminModal(){
+  document.getElementById('adminModal').style.display = 'none';
+}
+document.getElementById('adminCloseBtn').addEventListener('click', closeAdminModal);
+
+async function switchAdminTab(tab){
+  _adminTab = tab;
+  document.getElementById('uatab-active').classList.toggle('active', tab==='active');
+  document.getElementById('uatab-hidden').classList.toggle('active', tab==='hidden');
+  await renderAdminUserList();
+}
+
+async function renderAdminUserList(){
+  const wrap = document.getElementById('pickerAdminBody');
+  wrap.innerHTML = '<div class="empty-state">読み込み中…</div>';
+  const snap = await db.collection('mitsumori_users').get();
+  const all = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  const list = all.filter(u => _adminTab==='hidden' ? u.hidden : !u.hidden);
+  if(list.length===0){
+    wrap.innerHTML = `<div class="empty-state">${_adminTab==='hidden' ? '非表示のユーザーはいません' : 'ユーザーがいません'}</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(u=>`
+    <div class="uitem">
+      <div>
+        <div class="un">${escapeHtml(u.name||u.email)}${u.isAdmin?'<span class="badge-admin">管理者</span>':''}${u.hidden?'<span class="badge-hidden">非表示</span>':''}</div>
+        <div class="ue">${escapeHtml(u.email||'')}</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        ${u.id===currentUser.uid ? '<span style="font-size:11px;color:var(--ink-soft);">（自分）</span>' : `
+          <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="isAdmin" data-val="${!u.isAdmin}" onclick="toggleUserField(this)">${u.isAdmin?'管理者を外す':'管理者にする'}</button>
+          <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="hidden" data-val="${!u.hidden}" onclick="toggleUserField(this)">${u.hidden?'表示に戻す':'非表示'}</button>
+        `}
+      </div>
+    </div>`).join('');
+}
+
+async function toggleUserField(btn){
+  const uid = btn.dataset.uid;
+  const field = btn.dataset.field;
+  const val = btn.dataset.val === 'true';
+  await db.collection('mitsumori_users').doc(uid).update({ [field]: val });
+  renderAdminUserList();
 }
 
 /* ========================= 共通ユーティリティ ========================= */
@@ -715,7 +1014,8 @@ function renderEstimate(){
   const rows = estimateItems.map(it=>{
     const srcBadge = it.priceSource==='master' ? '<span class="price-src master">単価表</span>'
       : it.priceSource==='ai' ? '<span class="price-src ai">AI概算</span>'
-      : it.priceSource==='manual' ? '<span class="price-src manual">手入力</span>' : '';
+      : it.priceSource==='manual' ? '<span class="price-src manual">手入力</span>'
+      : it.priceSource==='catalog' ? '<span class="price-src catalog">メーカー単価表</span>' : '';
     return `
     <tr>
       <td>${escapeHtml(it.name)}<div style="font-size:11px;color:var(--ink-soft);">${escapeHtml(it.spec)}</div></td>
@@ -723,7 +1023,7 @@ function renderEstimate(){
       <td>${escapeHtml(it.unit)}</td>
       <td class="num"><input type="number" style="width:84px;" value="${it.unitPrice}" onchange="updateEstimate('${it.id}','unitPrice',this.value)">${srcBadge}</td>
       <td class="num">${yen(it.qty*it.unitPrice)}</td>
-      <td><button class="del" onclick="removeEstimate('${it.id}')">✕</button></td>
+      <td><button class="btn btn-ghost" style="padding:4px 7px; font-size:11px;" onclick="openCatalogPicker('${it.id}')">🏷</button> <button class="del" onclick="removeEstimate('${it.id}')">✕</button></td>
     </tr>`;
   }).join('');
   wrap.innerHTML = `
@@ -751,6 +1051,93 @@ function computeTotals(){
   document.getElementById('taxVal').textContent = yen(tax);
   document.getElementById('grandVal').textContent = yen(subtotal+tax);
 }
+
+/* ========================= 単価表ピッカー（ジャンル→メーカー→品目） ========================= */
+let _pickerState = { estimateItemId:null, step:'genre', genre:null, manufacturer:null, catalog:[] };
+
+async function openCatalogPicker(estimateItemId){
+  if(!db){ toast('Firebase未設定のためメーカー単価表がありません'); return; }
+  document.getElementById('pickerModal').style.display = 'flex';
+  document.getElementById('pickerModalBody').innerHTML = '<div class="empty-state">読み込み中…</div>';
+  document.getElementById('pickerBackBtn').style.display = 'none';
+  const catalog = await loadCatalogItems();
+  _pickerState = { estimateItemId, step:'genre', genre:null, manufacturer:null, catalog };
+  if(catalog.length===0){
+    document.getElementById('pickerModalBody').innerHTML = '<div class="empty-state"><span class="mark">未登録</span>ステップ06でメーカー単価表を取り込んでください</div>';
+    return;
+  }
+  renderPickerStep();
+}
+function closePickerModal(){
+  document.getElementById('pickerModal').style.display = 'none';
+}
+function renderPickerStep(){
+  const title = document.getElementById('pickerModalTitle');
+  const backBtn = document.getElementById('pickerBackBtn');
+  const body = document.getElementById('pickerModalBody');
+  const { step, genre, manufacturer, catalog } = _pickerState;
+
+  if(step==='genre'){
+    title.textContent = '単価表から選ぶ：ジャンル';
+    backBtn.style.display = 'none';
+    const genres = {};
+    catalog.forEach(it=>{ genres[it.genre] = (genres[it.genre]||0)+1; });
+    body.innerHTML = `<div class="picker-chip-grid">${Object.keys(genres).map(g=>`
+      <div class="picker-chip" data-genre="${escapeHtml(g)}" onclick="pickerSelectGenre(this.dataset.genre)">${escapeHtml(g)}<span class="cnt">(${genres[g]})</span></div>
+    `).join('')}</div>`;
+  } else if(step==='manufacturer'){
+    title.textContent = `単価表から選ぶ：${genre} のメーカー`;
+    backBtn.style.display = '';
+    const mfrs = {};
+    catalog.filter(it=>it.genre===genre).forEach(it=>{ mfrs[it.manufacturer] = (mfrs[it.manufacturer]||0)+1; });
+    body.innerHTML = `<div class="picker-chip-grid">${Object.keys(mfrs).map(m=>`
+      <div class="picker-chip" data-mfr="${escapeHtml(m)}" onclick="pickerSelectManufacturer(this.dataset.mfr)">${escapeHtml(m)}<span class="cnt">(${mfrs[m]})</span></div>
+    `).join('')}</div>`;
+  } else if(step==='item'){
+    title.textContent = `単価表から選ぶ：${genre} / ${manufacturer}`;
+    backBtn.style.display = '';
+    const list = catalog.filter(it=>it.genre===genre && it.manufacturer===manufacturer);
+    body.innerHTML = list.map(it=>`
+      <div class="picker-item-row" data-item-id="${it.id}" onclick="pickerSelectItem(this.dataset.itemId)">
+        <div>
+          <div class="name">${escapeHtml(it.itemName)}</div>
+          ${it.grade ? `<div class="grade">${escapeHtml(it.grade)}</div>` : ''}
+        </div>
+        <div class="price">${yen(it.unitPrice)}</div>
+      </div>`).join('');
+  }
+}
+function pickerSelectGenre(genre){
+  _pickerState.step = 'manufacturer';
+  _pickerState.genre = genre;
+  renderPickerStep();
+}
+function pickerSelectManufacturer(mfr){
+  _pickerState.step = 'item';
+  _pickerState.manufacturer = mfr;
+  renderPickerStep();
+}
+function pickerSelectItem(itemId){
+  const it = _pickerState.catalog.find(x=>x.id===itemId);
+  if(!it) return;
+  const est = estimateItems.find(x=>x.id===_pickerState.estimateItemId);
+  if(est){
+    est.name = it.itemName + (it.grade ? `（${it.grade}）` : '');
+    est.unit = it.unit || est.unit;
+    est.unitPrice = it.unitPrice;
+    est.priceSource = 'catalog';
+    renderEstimate();
+    toast('「' + it.itemName + '」の単価を反映しました');
+  }
+  closePickerModal();
+}
+function pickerGoBack(){
+  if(_pickerState.step==='item'){ _pickerState.step='manufacturer'; }
+  else if(_pickerState.step==='manufacturer'){ _pickerState.step='genre'; }
+  renderPickerStep();
+}
+document.getElementById('pickerBackBtn').addEventListener('click', pickerGoBack);
+document.getElementById('pickerCloseBtn').addEventListener('click', closePickerModal);
 
 /* 単価の一括引き当て：Firestore単価表 → 見つからなければAI概算 */
 document.getElementById('autoPriceBtn').addEventListener('click', async ()=>{
@@ -889,31 +1276,177 @@ document.getElementById('masterExcelInput').addEventListener('change', async (e)
   }
 });
 
+/* ========================= 06 メーカー単価表 ========================= */
+const GENRE_LIST = ['キッチン','浴室','トイレ','洗面所','フローリング','建具','外壁','屋根','その他'];
+
+async function loadCatalogItems(){
+  if(!db) return [];
+  const snap = await db.collection('mitsumori_catalog_items').get();
+  return snap.docs.map(d=>({ id:d.id, ...d.data() }));
+}
+
+async function renderMfrList(){
+  const wrap = document.getElementById('mfrList');
+  if(!db){
+    wrap.innerHTML = '<div class="empty-state">Firebase未設定のためメーカー単価表は保存されません</div>';
+    return;
+  }
+  const items = await loadCatalogItems();
+  if(items.length===0){
+    wrap.innerHTML = '<div class="empty-state"><span class="mark">未登録</span>上のフォームからメーカー単価表を取り込んでください</div>';
+    return;
+  }
+  const byMfr = {};
+  items.forEach(it=>{ (byMfr[it.manufacturer] = byMfr[it.manufacturer]||[]).push(it); });
+  wrap.innerHTML = `
+    <div class="mfr-row head"><div>メーカー</div><div>件数</div><div></div></div>
+    ${Object.keys(byMfr).map(name=>`
+      <div class="mfr-row">
+        <div>${escapeHtml(name)}</div>
+        <div>${byMfr[name].length}件</div>
+        <button class="del" data-mfr="${escapeHtml(name)}" onclick="deleteMfr(this.dataset.mfr)">✕</button>
+      </div>`).join('')}`;
+}
+
+async function deleteMfr(name){
+  if(!db) return;
+  if(!confirm('「' + name + '」の単価表を削除しますか？')) return;
+  const snap = await db.collection('mitsumori_catalog_items').where('manufacturer','==',name).get();
+  const batch = db.batch();
+  snap.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+  renderMfrList();
+}
+
+/* Excelメーカー単価表の取り込み：パース → AIがジャンル/グレード判定 → Firestore保存 */
+document.getElementById('mfrExcelInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('mfrImportStatus');
+  const mfrName = document.getElementById('mfrNameInput').value.trim() || file.name.replace(/\.[^.]+$/,'');
+  if(!db){
+    statusEl.textContent = 'Firebase未設定のため取り込めません';
+    e.target.value = '';
+    return;
+  }
+  statusEl.textContent = '読み込み中…';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1 });
+    const dataRows = rows.slice(1)
+      .filter(r=>r && r[0])
+      .map(r=>({ name:String(r[0]||'').trim(), price:Number(r[1])||0, unit:String(r[2]||'式').trim() }));
+    if(dataRows.length===0){
+      statusEl.textContent = '品目を検出できませんでした（列構成をご確認ください）';
+      return;
+    }
+
+    const CHUNK = 35;
+    const classified = [];
+    for(let i=0; i<dataRows.length; i+=CHUNK){
+      const chunk = dataRows.slice(i, i+CHUNK);
+      statusEl.textContent = `AIがジャンルを判定中…（${Math.min(i+CHUNK,dataRows.length)}/${dataRows.length}件）`;
+      const schema = {
+        type:"OBJECT",
+        properties:{ items:{ type:"ARRAY", items:{ type:"OBJECT", properties:{
+          index:{ type:"NUMBER", description:"品目リストの番号" },
+          genre:{ type:"STRING", description:`次のいずれか1つを必ずそのまま使う: ${GENRE_LIST.join('/')}` },
+          grade:{ type:"STRING", description:"グレード・シリーズ名（品目名から読み取れなければ空文字）" }
+        }, required:["index","genre"] } } },
+        required:["items"]
+      };
+      const prompt = `あなたは建設資材のカタログ分類の専門家です。以下は「${mfrName}」の単価表に含まれる品目一覧です。
+各品目を、次のジャンルのいずれか1つに分類してください（このリストの表記をそのまま使うこと）:
+${GENRE_LIST.join('・')}
+
+また、品目名からグレード・シリーズ名が読み取れる場合は grade に記載してください（読み取れなければ空文字）。
+
+【品目リスト】
+${chunk.map((it,idx)=>`${idx}: ${it.name}`).join('\n')}
+
+出力はJSONのみ。前置き・Markdown記法は不要です。`;
+      try{
+        const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
+        const parsed = safeParseJSON(raw);
+        const results = (parsed && Array.isArray(parsed.items)) ? parsed.items : [];
+        chunk.forEach((it,idx)=>{
+          const r = results.find(x=>Number(x.index)===idx);
+          const genre = (r && GENRE_LIST.includes(r.genre)) ? r.genre : 'その他';
+          const grade = (r && r.grade) ? String(r.grade).trim() : '';
+          classified.push({ ...it, genre, grade });
+        });
+      }catch(err){
+        console.error('genre classify error', err);
+        chunk.forEach(it=>classified.push({ ...it, genre:'その他', grade:'' }));
+      }
+    }
+
+    statusEl.textContent = 'Firestoreに保存中…';
+    const batch = db.batch();
+    classified.forEach(it=>{
+      const ref = db.collection('mitsumori_catalog_items').doc();
+      batch.set(ref, {
+        manufacturer: mfrName,
+        genre: it.genre,
+        itemName: it.name,
+        grade: it.grade,
+        unitPrice: it.price,
+        unit: it.unit,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    statusEl.textContent = `「${mfrName}」の単価表 ${classified.length}件を取り込みました`;
+    document.getElementById('mfrExcelInput').value = '';
+    document.getElementById('mfrNameInput').value = '';
+    renderMfrList();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '取り込みに失敗しました（列構成をご確認ください）';
+  }
+});
+
 /* ========================= 05 Excel書式管理 ========================= */
-let templates = [
+const DEFAULT_TEMPLATES = [
   {
-    id: 'std',
     name: '標準見積書',
     desc: '品名・数量・単位・単価・金額の一般的な様式',
     headerTitle: '御 見 積 書',
     columns: ['品名・仕様','数量','単位','単価','金額']
   },
   {
-    id: 'detail',
     name: '詳細内訳付き見積書',
     desc: '工種カテゴリ別の内訳欄つき。大型改修向け',
     headerTitle: '御 見 積 書（内訳付）',
     columns: ['工種','品名・仕様','数量','単位','単価','金額']
   },
   {
-    id: 'simple',
     name: '簡易見積書',
     desc: '式一括表記。小工事・急ぎの提示に',
     headerTitle: 'お見積り',
     columns: ['内容','金額']
   }
 ];
-let selectedTemplateId = 'std';
+let templates = DEFAULT_TEMPLATES.map((t,i)=>({ id:'local'+i, ...t }));
+let selectedTemplateId = templates[0].id;
+
+/* Firestoreから書式一覧を読み込み。未登録ならデフォルト3種をseedする */
+async function loadTemplates(){
+  if(!db) return;
+  const snap = await db.collection('mitsumori_templates').get();
+  if(snap.empty){
+    const batch = db.batch();
+    DEFAULT_TEMPLATES.forEach(t=>batch.set(db.collection('mitsumori_templates').doc(), t));
+    await batch.commit();
+    const snap2 = await db.collection('mitsumori_templates').get();
+    templates = snap2.docs.map(d=>({ id:d.id, ...d.data() }));
+  } else {
+    templates = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  }
+  selectedTemplateId = templates[0].id;
+}
 
 function renderTemplateList(){
   const wrap = document.getElementById('templateList');
@@ -939,27 +1472,69 @@ function selectTemplate(id){
   selectedTemplateId = id;
   renderTemplateList();
 }
-function editTemplate(id){
+async function editTemplate(id){
   const t = templates.find(x=>x.id===id);
   if(!t) return;
   const newTitle = prompt('見積書のヘッダー文言', t.headerTitle);
   if(newTitle!==null) t.headerTitle = newTitle;
   const newCols = prompt('列構成をカンマ区切りで入力', t.columns.join(','));
   if(newCols!==null) t.columns = newCols.split(',').map(s=>s.trim()).filter(Boolean);
+  if(db) await db.collection('mitsumori_templates').doc(t.id).update({ headerTitle:t.headerTitle, columns:t.columns });
   renderTemplateList();
 }
-function deleteTemplate(id){
+async function deleteTemplate(id){
   if(templates.length<=1){ toast('最低1つは残してください'); return; }
+  if(db) await db.collection('mitsumori_templates').doc(id).delete();
   templates = templates.filter(t=>t.id!==id);
   if(selectedTemplateId===id) selectedTemplateId = templates[0].id;
   renderTemplateList();
 }
-document.getElementById('addTemplateBtn').addEventListener('click', ()=>{
+document.getElementById('addTemplateBtn').addEventListener('click', async ()=>{
   const name = prompt('新しい書式の名前');
   if(!name) return;
-  const t = { id: uid(), name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'] };
-  templates.push(t);
+  const t = { name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'] };
+  let id = uid();
+  if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
+  templates.push({ id, ...t });
+  selectedTemplateId = id;
   renderTemplateList();
+});
+
+/* Excel見積書から書式を取り込み */
+document.getElementById('templateExcelInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('templateImportStatus');
+  statusEl.textContent = '読み込み中…';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1 });
+    const nonEmpty = r => (r||[]).filter(c=>c!==undefined && c!==null && String(c).trim()!=='');
+    const titleRowIdx = rows.findIndex(r=>nonEmpty(r).length>0);
+    const headerTitle = titleRowIdx>=0 ? String(nonEmpty(rows[titleRowIdx])[0]).trim() : file.name.replace(/\.[^.]+$/,'');
+
+    let columns = null;
+    for(let i=titleRowIdx+1; i<Math.min(rows.length, titleRowIdx+12); i++){
+      const cells = nonEmpty(rows[i]);
+      const looksLikeHeader = cells.length>=3 && cells.length<=8 && cells.every(c=>String(c).trim().length<=20);
+      if(looksLikeHeader){ columns = cells.map(c=>String(c).trim()); break; }
+    }
+    if(!columns) columns = ['品名・仕様','数量','単位','単価','金額'];
+
+    const name = file.name.replace(/\.[^.]+$/,'');
+    const t = { name, desc:'アップロードされた書式', headerTitle, columns };
+    let id = uid();
+    if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
+    templates.push({ id, ...t });
+    selectedTemplateId = id;
+    renderTemplateList();
+    statusEl.textContent = `「${name}」として取り込みました（列: ${columns.join('・')}）`;
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '取り込みに失敗しました（内容をご確認ください）';
+  }
 });
 
 /* ========================= 出力：Excel / PDF ========================= */
@@ -1023,9 +1598,8 @@ async function saveEstimateHistory(project, client, total){
   }catch(e){ console.error('history save error', e); }
 }
 
-/* ========================= 初期化 ========================= */
-renderTemplateList();
-renderMasterList();
+/* 初期化は認証状態確定後（onAuthStateChanged / Firebase未設定時のフォールバック）に
+   bootAppAfterAuth() から呼び出される */
 </script>
 </body>
 </html>
