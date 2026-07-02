@@ -11,6 +11,11 @@ service cloud.firestore {
     function isOwner(uid) {
       return isAuth() && request.auth.uid == uid;
     }
+    function isMitsumoriAdmin() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.isAdmin == true;
+    }
 
     match /users/{uid} {
       allow read: if isAuth();
@@ -223,9 +228,9 @@ service cloud.firestore {
         (request.auth.uid == uid &&
           request.resource.data.isAdmin == resource.data.isAdmin &&
           request.resource.data.hidden == resource.data.hidden) ||
-        isAdmin()
+        isMitsumoriAdmin()
       );
-      allow delete: if isAdmin();
+      allow delete: if isMitsumoriAdmin();
     }
     match /mitsumori_price_master/{docId} {
       allow read, write: if isAuth();
