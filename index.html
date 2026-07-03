@@ -484,6 +484,8 @@
         <div class="mode-chip active" id="uatab-active" onclick="switchAdminTab('active')">表示中</div>
         <div class="mode-chip" id="uatab-hidden" onclick="switchAdminTab('hidden')">非表示</div>
       </div>
+      <button class="btn btn-outline btn-full" id="addUserConsoleBtn" style="margin-top:10px;">＋ Firebase Consoleでユーザーを追加</button>
+      <p style="font-size:11px; color:var(--ink-soft); margin:6px 0 0;">Authenticationタブの「Add user」でメールアドレスと仮パスワードを発行してください。本人が一度ログインすると、この一覧に自動で表示されます。</p>
     </div>
     <div id="pickerAdminBody" style="overflow-y:auto; padding:4px 14px 14px;"></div>
   </div>
@@ -630,6 +632,13 @@ function closeAdminModal(){
   document.getElementById('adminModal').style.display = 'none';
 }
 document.getElementById('adminCloseBtn').addEventListener('click', closeAdminModal);
+document.getElementById('addUserConsoleBtn').addEventListener('click', ()=>{
+  const projectId = firebaseConfig.projectId;
+  const url = projectId
+    ? `https://console.firebase.google.com/project/${projectId}/authentication/users`
+    : 'https://console.firebase.google.com/';
+  window.open(url, '_blank', 'noopener');
+});
 
 async function switchAdminTab(tab){
   _adminTab = tab;
