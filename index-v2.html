@@ -447,6 +447,9 @@
         <div class="row"><span>小計</span><span class="mono" id="subtotalVal">¥0</span></div>
         <div class="row"><span>消費税（10%）</span><span class="mono" id="taxVal">¥0</span></div>
         <div class="row grand"><span>合計</span><span class="mono" id="grandVal">¥0</span></div>
+        <div class="row" style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--paper-line);"><span>原価小計</span><span class="mono" id="costSubtotalVal">¥0</span></div>
+        <div class="row"><span>粗利</span><span class="mono" id="grossProfitVal">¥0</span></div>
+        <div class="row"><span>粗利率</span><span class="mono" id="marginRateVal">-</span></div>
       </div>
     </div>
 
@@ -678,6 +681,23 @@ function calcTotals(items){
   return { subtotal, tax, total: subtotal+tax };
 }
 
+/* ========================= 粗利チェック（v2で新規追加） =========================
+   しきい値は暫定値。業種・案件により適切な値に調整してください
+   （このアプリにはまだ粗利の実績データが無いため確定値ではありません）。
+========================================================= */
+const MARGIN_THRESHOLD_PERCENT = 20;
+
+function calcMargin(items){
+  const sellSubtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const costSubtotal = items.reduce((s,it)=>s + it.qty*(it.costPrice||0), 0);
+  const grossProfit = sellSubtotal - costSubtotal;
+  const marginRate = sellSubtotal > 0 ? (grossProfit/sellSubtotal*100) : null;
+  // 「原価が1件も入力されていない」場合は原価未設定として区別する
+  // （0円と未設定を同一視すると、粗利100%という誤った表示になるため）
+  const hasAnyCost = items.some(it => (it.costPrice||0) > 0);
+  return { sellSubtotal, costSubtotal, grossProfit, marginRate, hasAnyCost };
+}
+
 function showCasesView(){
   unsubscribeActiveCase();
   activeCaseId = null;
@@ -735,6 +755,10 @@ function renderCaseTile(c){
   const modeLabel = { confirmed:'現場確定', deferred:'PC後決め', ai_provisional:'AI仮単価' }[c.priceMode] || '';
   const modeBadge = c.priceMode ? `<span class="mode-badge ${c.priceMode}">${modeLabel}</span>` : '';
   const statusBadge = c.status==='won' ? '<span class="margin-badge ok">受注</span>' : c.status==='lost' ? '<span class="margin-badge warn">失注</span>' : '';
+  const margin = calcMargin(c.items || []);
+  const marginBadge = margin.hasAnyCost
+    ? `<span class="margin-badge ${margin.marginRate!==null && margin.marginRate < MARGIN_THRESHOLD_PERCENT ? 'warn' : 'ok'}">粗利${margin.marginRate===null?'-':margin.marginRate.toFixed(0)+'%'}</span>`
+    : '';
   let actions = '';
   if(c.status==='draft') actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','pc_pending')">PCへ送る</button>`;
   if(c.status==='pc_pending') actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','sent')">送付済みにする</button>`;
@@ -742,11 +766,12 @@ function renderCaseTile(c){
     actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','won')">受注</button>`;
     actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','lost')">失注</button>`;
   }
+  actions += `<button onclick="event.stopPropagation(); duplicateCase('${c.id}')">複製</button>`;
   return `
     <div class="case-tile" onclick="openCase('${c.id}', false)">
       <div class="c-name">${escapeHtml(c.project||'（案件名未入力）')}${modeBadge}${statusBadge}</div>
       <div class="c-client">${escapeHtml(c.client||'')}</div>
-      <div class="c-total">${yen(c.total||0)}</div>
+      <div class="c-total">${yen(c.total||0)}${marginBadge}</div>
       <div class="c-meta">更新: ${formatCaseTime(c.updatedAt)}</div>
       <div class="c-actions">${actions}</div>
     </div>`;
@@ -768,6 +793,37 @@ async function updateCaseStatus(caseId, status){
   }catch(e){
     console.error(e);
     toast('ステータス更新に失敗しました（他人の案件は管理者のみ操作できます）');
+  }
+}
+
+/* 過去案件の複製（v2で新規追加）。mitsumori_history（priceMode/costPrice/statusを
+   持たない旧形式）ではなく、mitsumori_casesを複製元とする */
+async function duplicateCase(caseId){
+  if(!db) return;
+  try{
+    const snap = await db.collection('mitsumori_cases').doc(caseId).get();
+    if(!snap.exists){ toast('複製元の案件が見つかりません'); return; }
+    const src = snap.data();
+    const newItems = (src.items || []).map(it=>({ ...it, id: uid() }));
+    const totals = calcTotals(newItems);
+    const ref = await db.collection('mitsumori_cases').add({
+      status: 'draft',
+      project: (src.project || '（案件名未入力）') + '（コピー）',
+      client: src.client || '',
+      priceMode: src.priceMode || 'confirmed',
+      items: newItems,
+      templateId: src.templateId || null,
+      subtotal: totals.subtotal, tax: totals.tax, total: totals.total,
+      ownerUid: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sentAt: null, closedAt: null
+    });
+    toast('案件を複製しました');
+    openCase(ref.id, false);
+  }catch(e){
+    console.error(e);
+    toast('複製に失敗しました');
   }
 }
 
@@ -1339,6 +1395,19 @@ function computeTotals(){
   document.getElementById('subtotalVal').textContent = yen(subtotal);
   document.getElementById('taxVal').textContent = yen(tax);
   document.getElementById('grandVal').textContent = yen(subtotal+tax);
+
+  const margin = calcMargin(estimateItems);
+  document.getElementById('costSubtotalVal').textContent = yen(margin.costSubtotal);
+  document.getElementById('grossProfitVal').textContent = yen(margin.grossProfit);
+  const rateEl = document.getElementById('marginRateVal');
+  if(!margin.hasAnyCost){
+    rateEl.textContent = '原価未設定';
+    rateEl.style.color = 'var(--ink-soft)';
+  } else {
+    const warn = margin.marginRate!==null && margin.marginRate < MARGIN_THRESHOLD_PERCENT;
+    rateEl.textContent = (margin.marginRate===null ? '-' : margin.marginRate.toFixed(1)+'%') + (warn ? ' ⚠️' : '');
+    rateEl.style.color = warn ? 'var(--red)' : 'var(--green)';
+  }
 }
 
 /* ========================= 単価表ピッカー（ジャンル→メーカー→品目） ========================= */
