@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() { return request.auth != null; }
+    function isAdmin() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    match /mitsumori_users/{uid} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow update: if isAuth() && (
+        (request.auth.uid == uid &&
+          request.resource.data.isAdmin == resource.data.isAdmin &&
+          request.resource.data.hidden == resource.data.hidden) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+    match /mitsumori_price_master/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /mitsumori_catalog_items/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /mitsumori_templates/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /mitsumori_history/{docId} {
+      allow read, create: if isAuth();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
