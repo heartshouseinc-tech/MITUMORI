@@ -236,6 +236,12 @@
   }
   .auth-logo{font-family:'Shippori Mincho',serif; font-size:22px; font-weight:800; text-align:center; color:var(--blue-deep);}
   .auth-tagline{text-align:center; font-size:11.5px; color:var(--ink-soft); margin:2px 0 18px;}
+  .auth-tabs{display:flex; gap:6px; margin-bottom:16px;}
+  .auth-tab{
+    flex:1; text-align:center; padding:9px 4px; font-size:12.5px; font-weight:700;
+    border:1px solid #D8D2C4; background:#FCFBF7; cursor:pointer; color:var(--ink-soft);
+  }
+  .auth-tab.on{background:var(--blue-deep); color:#fff; border-color:var(--blue-deep);}
   .auth-err{color:var(--red); font-size:12px; min-height:16px; margin-top:6px;}
 
   .uitem{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-line);}
@@ -285,6 +291,10 @@
   <div class="auth-card">
     <div class="auth-logo">見積AI帳場</div>
     <div class="auth-tagline">HEARTS HOUSE INC. / 現場帳場</div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="atab-li" onclick="authTab('li')">ログイン</button>
+      <button class="auth-tab" id="atab-reg" onclick="authTab('reg')">新規登録</button>
+    </div>
     <div id="aform-li">
       <label class="field-label">メールアドレス</label>
       <input type="email" id="li-email" placeholder="example@email.com">
@@ -292,7 +302,16 @@
       <input type="password" id="li-pass" placeholder="パスワード">
       <div class="auth-err" id="li-err"></div>
       <button class="btn btn-primary btn-full" style="margin-top:6px;" onclick="doLogin()">ログイン</button>
-      <p style="font-size:11.5px; color:var(--ink-soft); margin-top:14px; text-align:center;">アカウントが必要な場合は管理者にお問い合わせください</p>
+    </div>
+    <div id="aform-reg" style="display:none;">
+      <label class="field-label">お名前</label>
+      <input type="text" id="reg-name" placeholder="山田 太郎">
+      <label class="field-label">メールアドレス</label>
+      <input type="email" id="reg-email" placeholder="example@email.com">
+      <label class="field-label">パスワード（6文字以上）</label>
+      <input type="password" id="reg-pass" placeholder="パスワード">
+      <div class="auth-err" id="reg-err"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:6px;" onclick="doRegister()">登録する</button>
     </div>
   </div>
 </div>
@@ -541,6 +560,13 @@ try{
 let currentUser = null;
 let currentUserIsAdmin = false;
 
+function authTab(t){
+  document.getElementById('aform-li').style.display = t==='li' ? 'block' : 'none';
+  document.getElementById('aform-reg').style.display = t==='reg' ? 'block' : 'none';
+  document.getElementById('atab-li').classList.toggle('on', t==='li');
+  document.getElementById('atab-reg').classList.toggle('on', t==='reg');
+}
+
 function authErrMsg(code){
   const m = {
     'auth/user-not-found':'ユーザーが見つかりません',
@@ -562,6 +588,25 @@ async function doLogin(){
   if(!auth){ err.textContent = 'Firebase未設定です'; return; }
   try{
     await auth.signInWithEmailAndPassword(email, pass);
+  }catch(e){
+    err.textContent = authErrMsg(e.code);
+  }
+}
+
+async function doRegister(){
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const err = document.getElementById('reg-err');
+  err.textContent = '';
+  if(!name || !email || !pass){ err.textContent = 'すべての項目を入力してください'; return; }
+  if(pass.length<6){ err.textContent = 'パスワードは6文字以上にしてください'; return; }
+  if(!auth){ err.textContent = 'Firebase未設定です'; return; }
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await db.collection('mitsumori_users').doc(cred.user.uid).set({
+      name, email, isAdmin:false, hidden:false, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
   }catch(e){
     err.textContent = authErrMsg(e.code);
   }
