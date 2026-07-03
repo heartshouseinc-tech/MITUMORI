@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>見積AI帳場 | Hearts House Inc.</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2A41">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="見積AI帳場">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F5F2EA;
+    --paper-line:rgba(22,35,58,0.10);
+    --ink:#16233A;
+    --ink-soft:#4A5568;
+    --blue:#2F5D8C;
+    --blue-deep:#1B2A41;
+    --amber:#C4762E;
+    --amber-deep:#A85F1E;
+    --green:#4B7B4E;
+    --red:#AD3B32;
+    --card:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 27px, var(--paper-line) 27px, var(--paper-line) 28px),
+      repeating-linear-gradient(90deg, transparent, transparent 27px, var(--paper-line) 27px, var(--paper-line) 28px),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Zen Kaku Gothic New', sans-serif;
+    padding-bottom:90px;
+  }
+  .mono{font-family:'JetBrains Mono', monospace;}
+  header.top{
+    background:var(--blue-deep);
+    color:#F5F2EA;
+    padding:22px 20px 18px;
+    position:relative;
+    overflow:hidden;
+    border-bottom:4px solid var(--amber);
+  }
+  header.top::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size:14px 14px;
+    pointer-events:none;
+  }
+  header.top .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:.18em;
+    color:#E8B87F;
+    text-transform:uppercase;
+  }
+  header.top h1{
+    font-family:'Shippori Mincho', serif;
+    font-weight:800;
+    font-size:26px;
+    margin:4px 0 2px;
+    letter-spacing:.02em;
+  }
+  header.top p{margin:0; font-size:12.5px; color:#B9C3D6;}
+
+  .steps{
+    display:flex;
+    overflow-x:auto;
+    gap:0;
+    background:var(--card);
+    border-bottom:1px solid var(--paper-line);
+    position:sticky; top:0; z-index:20;
+    box-shadow:0 2px 6px rgba(22,35,58,0.06);
+  }
+  .step-btn{
+    flex:1 0 auto;
+    min-width:78px;
+    padding:10px 8px 9px;
+    text-align:center;
+    background:none; border:none; cursor:pointer;
+    border-bottom:3px solid transparent;
+    color:var(--ink-soft);
+  }
+  .step-btn .num{
+    display:block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.1em; color:var(--amber-deep);
+  }
+  .step-btn .label{display:block; font-size:12px; font-weight:700; margin-top:2px;}
+  .step-btn.active{border-bottom-color:var(--amber); color:var(--ink);}
+  .step-btn.active .num{color:var(--amber);}
+
+  main{padding:16px;}
+  .panel{display:none;}
+  .panel.active{display:block; animation:fadeIn .25s ease;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)}}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:2px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:0 1px 0 rgba(22,35,58,0.04);
+  }
+  .card h2{
+    font-family:'Shippori Mincho', serif;
+    font-size:16px; margin:0 0 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card h2 .tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; background:var(--blue); color:#fff; padding:2px 6px; border-radius:2px; letter-spacing:.05em;
+  }
+  label.field-label{
+    display:block; font-size:11.5px; font-weight:700; color:var(--ink-soft); margin:10px 0 5px; letter-spacing:.03em;
+  }
+  textarea, input[type=text], input[type=number], input[type=email], input[type=password], select{
+    width:100%; padding:10px; border:1px solid #D8D2C4; border-radius:2px;
+    font-family:inherit; font-size:14px; background:#FCFBF7; color:var(--ink);
+  }
+  textarea{min-height:96px; resize:vertical;}
+  input:focus, textarea:focus, select:focus{outline:2px solid var(--blue); outline-offset:1px;}
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:11px 16px; border-radius:2px; border:none; cursor:pointer;
+    font-weight:700; font-size:13.5px; letter-spacing:.02em;
+  }
+  .btn-primary{background:var(--amber); color:#fff;}
+  .btn-primary:active{background:var(--amber-deep);}
+  .btn-outline{background:transparent; border:1.5px solid var(--blue); color:var(--blue);}
+  .btn-ghost{background:#EFEAE0; color:var(--ink);}
+  .btn-danger{background:transparent; border:1.5px solid var(--red); color:var(--red);}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .btn-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+  .btn-full{width:100%;}
+
+  .input-mode-row{display:flex; gap:6px; margin-bottom:10px;}
+  .mode-chip{
+    flex:1; text-align:center; padding:8px 4px; font-size:12px; font-weight:700;
+    border:1px solid #D8D2C4; background:#FCFBF7; cursor:pointer; color:var(--ink-soft);
+  }
+  .mode-chip.active{background:var(--blue-deep); color:#fff; border-color:var(--blue-deep);}
+
+  .item-row{
+    display:flex; align-items:flex-start; gap:10px; padding:10px 0;
+    border-bottom:1px dashed var(--paper-line);
+  }
+  .item-row:last-child{border-bottom:none;}
+  .item-row input[type=checkbox]{width:19px; height:19px; margin-top:3px; accent-color:var(--amber);}
+  .item-main{flex:1;}
+  .item-main .name{font-weight:700; font-size:14px;}
+  .item-main .spec{font-size:12px; color:var(--ink-soft); margin-top:1px;}
+  .item-main .meta{display:flex; gap:10px; margin-top:6px; font-size:12px;}
+  .item-main .meta input{width:72px; padding:5px 7px; font-size:12.5px;}
+  .add-one{
+    align-self:center; background:var(--blue); color:#fff; border:none; border-radius:50%;
+    width:30px; height:30px; font-size:18px; line-height:1; cursor:pointer;
+  }
+
+  table.est-table{width:100%; border-collapse:collapse; font-size:13px;}
+  table.est-table th{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+    text-align:left; padding:6px 4px; border-bottom:2px solid var(--ink); color:var(--ink-soft);
+  }
+  table.est-table td{padding:8px 4px; border-bottom:1px solid var(--paper-line); vertical-align:top;}
+  table.est-table td.num, table.est-table th.num{text-align:right; font-family:'JetBrains Mono',monospace;}
+  table.est-table input{padding:5px 6px; font-size:12.5px;}
+  .price-src{font-size:10px; padding:1px 5px; border-radius:2px; margin-left:4px;}
+  .price-src.master{background:#E3EEE3; color:var(--green);}
+  .price-src.ai{background:#F3E6D8; color:var(--amber-deep);}
+  .price-src.manual{background:#E5E9F0; color:var(--blue);}
+  .price-src.catalog{background:#EAF3EC; color:#2E7D46;}
+
+  .totals{margin-top:14px; border-top:2px solid var(--ink); padding-top:10px;}
+  .totals .row{display:flex; justify-content:space-between; padding:3px 0; font-size:13.5px;}
+  .totals .row.grand{font-size:19px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--amber-deep); border-top:1px dashed var(--paper-line); margin-top:6px; padding-top:8px;}
+
+  .template-card{
+    border:1.5px solid #D8D2C4; padding:12px; margin-bottom:8px; cursor:pointer; border-radius:2px; background:#FCFBF7;
+  }
+  .template-card.selected{border-color:var(--amber); background:#FCF3E8;}
+  .template-card .t-name{font-weight:800; font-size:14px;}
+  .template-card .t-desc{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+
+  .empty-state{
+    text-align:center; padding:30px 10px; color:var(--ink-soft); font-size:13px;
+  }
+  .empty-state .mark{font-family:'Shippori Mincho',serif; font-size:28px; color:var(--blue); display:block; margin-bottom:6px;}
+
+  .master-row{display:grid; grid-template-columns:1fr 70px 60px 44px; gap:6px; align-items:center; padding:7px 0; border-bottom:1px solid var(--paper-line); font-size:13px;}
+  .master-row.head{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-soft); border-bottom:2px solid var(--ink);}
+  .master-row .del{background:none; border:none; color:var(--red); cursor:pointer; font-size:16px;}
+
+  .mic-btn{
+    width:100%; padding:12px; border:1.5px dashed var(--blue); background:#EFF4F9; color:var(--blue);
+    border-radius:2px; font-weight:700; cursor:pointer;
+  }
+  .mic-btn.recording{background:var(--red); color:#fff; border-style:solid; border-color:var(--red);}
+
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:3px; font-size:13px; z-index:100;
+    opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+
+  .config-warn{
+    background:#FCEFE8; border:1px solid #E3B58D; color:var(--amber-deep); font-size:12px;
+    padding:10px 12px; border-radius:2px; margin-bottom:14px;
+  }
+  .loading{display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .mfr-row{display:grid; grid-template-columns:1fr 70px 44px; gap:6px; align-items:center; padding:7px 0; border-bottom:1px solid var(--paper-line); font-size:13px;}
+  .mfr-row.head{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-soft); border-bottom:2px solid var(--ink);}
+  .mfr-row .del{background:none; border:none; color:var(--red); cursor:pointer; font-size:16px;}
+
+  .auth-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-card{
+    width:100%; max-width:380px; background:var(--card); border:1px solid var(--paper-line);
+    border-radius:2px; padding:26px 22px; box-shadow:0 2px 10px rgba(22,35,58,.08);
+  }
+  .auth-logo{font-family:'Shippori Mincho',serif; font-size:22px; font-weight:800; text-align:center; color:var(--blue-deep);}
+  .auth-tagline{text-align:center; font-size:11.5px; color:var(--ink-soft); margin:2px 0 18px;}
+  .auth-err{color:var(--red); font-size:12px; min-height:16px; margin-top:6px;}
+
+  .uitem{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid var(--paper-line);}
+  .uitem .un{font-size:13.5px; font-weight:700;}
+  .uitem .ue{font-size:11.5px; color:var(--ink-soft);}
+  .badge-admin{background:#F3E6D8; color:var(--amber-deep); font-size:10px; padding:1px 5px; border-radius:2px; margin-left:4px;}
+  .badge-hidden{background:#E5E9F0; color:var(--ink-soft); font-size:10px; padding:1px 5px; border-radius:2px; margin-left:4px;}
+
+  .picker-modal{
+    position:fixed; inset:0; background:rgba(22,35,58,.55); z-index:200;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .picker-modal-inner{
+    background:var(--paper); width:100%; max-width:520px; max-height:82vh;
+    border-radius:8px 8px 0 0; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .picker-modal-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:12px 14px; border-bottom:1px solid var(--paper-line); font-weight:800; font-size:14px;
+  }
+  #pickerModalBody{overflow-y:auto; padding:12px 14px;}
+  .picker-chip-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .picker-chip{
+    padding:10px 14px; border:1px solid #D8D2C4; background:#FCFBF7; border-radius:20px;
+    font-size:13px; font-weight:700; color:var(--ink); cursor:pointer;
+  }
+  .picker-chip .cnt{color:var(--ink-soft); font-weight:400; font-size:11px; margin-left:4px;}
+  .picker-item-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:10px 4px; border-bottom:1px solid var(--paper-line); cursor:pointer;
+  }
+  .picker-item-row .name{font-size:13.5px; font-weight:700;}
+  .picker-item-row .grade{font-size:11.5px; color:var(--ink-soft);}
+  .picker-item-row .price{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--blue-deep);}
+
+  @media print{
+    header.top, .steps, .btn-row, .no-print{display:none !important;}
+    body{background:#fff; padding:0;}
+    .panel{display:block !important;}
+    #panel-output{display:block !important;}
+  }
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="auth-screen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-logo">見積AI帳場</div>
+    <div class="auth-tagline">HEARTS HOUSE INC. / 現場帳場</div>
+    <div id="aform-li">
+      <label class="field-label">メールアドレス</label>
+      <input type="email" id="li-email" placeholder="example@email.com">
+      <label class="field-label">パスワード</label>
+      <input type="password" id="li-pass" placeholder="パスワード">
+      <div class="auth-err" id="li-err"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:6px;" onclick="doLogin()">ログイン</button>
+      <p style="font-size:11.5px; color:var(--ink-soft); margin-top:14px; text-align:center;">アカウントが必要な場合は管理者にお問い合わせください</p>
+    </div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none;">
+
+<header class="top">
+  <div class="eyebrow">HEARTS HOUSE INC. / 現場帳場</div>
+  <h1>見積AI帳場</h1>
+  <p>依頼を解析し、単価をあて、見積書に仕立てる</p>
+  <div class="no-print" style="position:absolute; top:16px; right:16px; display:flex; gap:6px;">
+    <button class="btn btn-ghost" id="adminBtn" style="display:none; padding:7px 10px; font-size:12px;" onclick="openAdminModal()">⚙️ 管理</button>
+    <button class="btn btn-ghost" id="logoutBtn" style="padding:7px 10px; font-size:12px;" onclick="doLogout()">ログアウト</button>
+  </div>
+</header>
+
+<nav class="steps no-print" id="steps">
+  <button class="step-btn active" data-panel="input"><span class="num">01</span><span class="label">依頼入力</span></button>
+  <button class="step-btn" data-panel="select"><span class="num">02</span><span class="label">項目選定</span></button>
+  <button class="step-btn" data-panel="output"><span class="num">03</span><span class="label">単価・出力</span></button>
+  <button class="step-btn" data-panel="master"><span class="num">04</span><span class="label">単価表</span></button>
+  <button class="step-btn" data-panel="templates"><span class="num">05</span><span class="label">書式管理</span></button>
+  <button class="step-btn" data-panel="manufacturers"><span class="num">06</span><span class="label">メーカー単価表</span></button>
+</nav>
+
+<main>
+
+  <div id="configWarn" class="config-warn" style="display:none;">
+    ⚠ Firebase設定が未入力です。コード先頭の <span class="mono">firebaseConfig</span> にプロジェクトの設定値を入れてください（単価表・履歴の保存に必要です）。
+  </div>
+
+  <!-- 01 依頼入力 -->
+  <section class="panel active" id="panel-input">
+    <div class="card">
+      <h2><span class="tag">01</span>見積もり依頼を入力</h2>
+
+      <div class="input-mode-row">
+        <div class="mode-chip active" data-mode="text">テキスト</div>
+        <div class="mode-chip" data-mode="file">画像・PDF</div>
+        <div class="mode-chip" data-mode="voice">音声</div>
+      </div>
+
+      <div id="mode-text">
+        <label class="field-label">依頼文（メール・チャット文面など）</label>
+        <textarea id="requestText" placeholder="例）〇〇邸の廻り階段の造作、破風・鼻隠しの改修、勝手口の建具交換をお願いしたい…"></textarea>
+      </div>
+
+      <div id="mode-file" style="display:none;">
+        <label class="field-label">現場図面・依頼書（画像 / PDF）</label>
+        <input type="file" id="fileInput" accept="image/*,application/pdf" multiple>
+        <div id="filePreview" style="margin-top:8px; font-size:12px; color:var(--ink-soft);"></div>
+      </div>
+
+      <div id="mode-voice" style="display:none;">
+        <label class="field-label">口頭で依頼内容を吹き込む</label>
+        <button class="mic-btn" id="micBtn">🎙 タップして録音開始</button>
+        <div id="voiceStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
+      </div>
+
+      <label class="field-label">補足メモ（任意）</label>
+      <input type="text" id="requestNote" placeholder="例）急ぎ・足場は別途・在来工法など">
+
+      <div class="btn-row">
+        <button class="btn btn-primary btn-full" id="analyzeBtn">AIに解析させる →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 項目選定 -->
+  <section class="panel" id="panel-select">
+    <div class="card">
+      <h2><span class="tag">02</span>AIが抽出した見積項目</h2>
+      <div class="btn-row" style="margin:0 0 10px;">
+        <button class="btn btn-ghost" id="selectAllBtn">一括選択</button>
+        <button class="btn btn-ghost" id="clearAllBtn">選択解除</button>
+      </div>
+      <div id="candidateList">
+        <div class="empty-state"><span class="mark">未解析</span>ステップ01で依頼を解析すると、ここに項目候補が並びます</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-full" id="addManualBtn">＋ 項目を手入力で追加</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-full" id="toOutputBtn">選択した項目を見積書へ →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 単価・出力 -->
+  <section class="panel" id="panel-output">
+    <div class="card">
+      <h2><span class="tag">03</span>見積明細</h2>
+      <div id="estimateTableWrap">
+        <div class="empty-state"><span class="mark">明細なし</span>ステップ02で項目を選んでください</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-full" id="autoPriceBtn">単価を一括で引き当てる（単価表→AI概算）</button>
+      </div>
+      <div class="totals" id="totalsBox" style="display:none;">
+        <div class="row"><span>小計</span><span class="mono" id="subtotalVal">¥0</span></div>
+        <div class="row"><span>消費税（10%）</span><span class="mono" id="taxVal">¥0</span></div>
+        <div class="row grand"><span>合計</span><span class="mono" id="grandVal">¥0</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="tag">→</span>見積書として出力</h2>
+      <label class="field-label">使用する書式（ステップ05で登録・編集可）</label>
+      <div id="templatePickerMini"></div>
+      <label class="field-label">案件名</label>
+      <input type="text" id="projectName" placeholder="例）〇〇邸 改修工事">
+      <label class="field-label">宛先</label>
+      <input type="text" id="clientName" placeholder="例）〇〇様">
+      <div class="btn-row">
+        <button class="btn btn-primary" id="exportExcelBtn">📊 Excel出力</button>
+        <button class="btn btn-outline" id="exportPdfBtn">🖨 PDF出力（印刷）</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 単価表 -->
+  <section class="panel" id="panel-master">
+    <div class="card">
+      <h2><span class="tag">04</span>単価マスタ（Firestore保存）</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">品目・単価を登録しておくと、AIが見積項目にマッチさせて自動で単価をあてます。</p>
+      <div class="master-row head">
+        <div>品目</div><div>単価</div><div>単位</div><div></div>
+      </div>
+      <div id="masterList"></div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-full" id="addMasterBtn">＋ 品目を追加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="tag">読込</span>既存Excel単価表をインポート</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">品目名・単価・単位の3列がある表を想定しています（1行目は見出し扱い）。</p>
+      <input type="file" id="masterExcelInput" accept=".xlsx,.xls,.csv">
+      <div id="masterImportStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
+    </div>
+  </section>
+
+  <!-- 05 書式管理 -->
+  <section class="panel" id="panel-templates">
+    <div class="card">
+      <h2><span class="tag">05</span>Excel見積書フォーマット</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">御社の実際の書式に合わせて、列構成やヘッダー文言を編集してください。複数登録して案件ごとに選べます。</p>
+      <div id="templateList"></div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-full" id="addTemplateBtn">＋ 書式を追加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="tag">読込</span>既存Excel見積書をアップロードして書式を取り込む</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">御社の実際の見積書Excelを読み込み、タイトル行・列見出しから書式を自動作成します。</p>
+      <input type="file" id="templateExcelInput" accept=".xlsx,.xls,.csv">
+      <div id="templateImportStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
+    </div>
+  </section>
+
+  <!-- 06 メーカー単価表 -->
+  <section class="panel" id="panel-manufacturers">
+    <div class="card">
+      <h2><span class="tag">06</span>メーカー単価表を取り込む</h2>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">メーカーごとの単価表（Excel）をアップロードすると、AIが品目をジャンル分けします。見積明細で「単価表から選ぶ」から段階的に絞り込んで単価をあてられます。</p>
+      <label class="field-label">メーカー名</label>
+      <input type="text" id="mfrNameInput" placeholder="例）LIXIL、TOTO、パナソニック">
+      <label class="field-label" style="margin-top:10px;">単価表（Excel）</label>
+      <input type="file" id="mfrExcelInput" accept=".xlsx,.xls,.csv">
+      <div id="mfrImportStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
+    </div>
+    <div class="card">
+      <h2><span class="tag">一覧</span>登録済みメーカー単価表</h2>
+      <div id="mfrList"></div>
+    </div>
+  </section>
+
+</main>
+
+</div><!-- /appRoot -->
+
+<div class="picker-modal" id="adminModal" style="display:none;">
+  <div class="picker-modal-inner">
+    <div class="picker-modal-head">
+      <span>⚙️ ユーザー管理</span>
+      <button class="btn btn-ghost" id="adminCloseBtn">✕</button>
+    </div>
+    <div style="padding:0 14px;">
+      <div class="input-mode-row" style="margin-top:12px;">
+        <div class="mode-chip active" id="uatab-active" onclick="switchAdminTab('active')">表示中</div>
+        <div class="mode-chip" id="uatab-hidden" onclick="switchAdminTab('hidden')">非表示</div>
+      </div>
+      <button class="btn btn-outline btn-full" id="addUserConsoleBtn" style="margin-top:10px;">＋ Firebase Consoleでユーザーを追加</button>
+      <p style="font-size:11px; color:var(--ink-soft); margin:6px 0 0;">Authenticationタブの「Add user」でメールアドレスと仮パスワードを発行してください。本人が一度ログインすると、この一覧に自動で表示されます。</p>
+    </div>
+    <div id="pickerAdminBody" style="overflow-y:auto; padding:4px 14px 14px;"></div>
+  </div>
+</div>
+
+<div class="picker-modal" id="pickerModal" style="display:none;">
+  <div class="picker-modal-inner">
+    <div class="picker-modal-head">
+      <span id="pickerModalTitle">単価表から選ぶ</span>
+      <button class="btn btn-ghost" id="pickerBackBtn" style="display:none;">← 戻る</button>
+      <button class="btn btn-ghost" id="pickerCloseBtn">✕</button>
+    </div>
+    <div id="pickerModalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   Firebase 設定
+   ※ Firebase Console → プロジェクト設定 から取得して入力してください
+   プロジェクトID候補: kensetsu-nippo-842a2
+========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCVk2miG5TK1ffTofXLh0hHgeSbOvmIgZ8",
+  authDomain: "kensetsu-nippo-842a2.firebaseapp.com",
+  projectId: "kensetsu-nippo-842a2",
+  storageBucket: "kensetsu-nippo-842a2.firebasestorage.app",
+  messagingSenderId: "702880974315",
+  appId: "1:702880974315:web:985321dc9180046629c5ae"
+};
+
+const ASK_AI_ENDPOINT = "https://us-central1-kensetsu-nippo-842a2.cloudfunctions.net/askAI";
+const ACCESS_KEY = "HeartsHouse2026Key";
+
+let db = null;
+let auth = null;
+try{
+  if(firebaseConfig.apiKey){
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+  } else {
+    document.getElementById('configWarn').style.display = 'block';
+  }
+}catch(e){
+  console.error('Firebase init error', e);
+  document.getElementById('configWarn').style.display = 'block';
+}
+
+/* ========================= 認証 ========================= */
+let currentUser = null;
+let currentUserIsAdmin = false;
+
+function authErrMsg(code){
+  const m = {
+    'auth/user-not-found':'ユーザーが見つかりません',
+    'auth/wrong-password':'パスワードが間違っています',
+    'auth/invalid-email':'メールアドレスが無効です',
+    'auth/email-already-in-use':'このメールアドレスは既に登録されています',
+    'auth/invalid-credential':'メールまたはパスワードが間違っています',
+    'auth/too-many-requests':'しばらく待ってから再試行してください'
+  };
+  return m[code] || (code || 'エラーが発生しました');
+}
+
+async function doLogin(){
+  const email = document.getElementById('li-email').value.trim();
+  const pass = document.getElementById('li-pass').value;
+  const err = document.getElementById('li-err');
+  err.textContent = '';
+  if(!email || !pass){ err.textContent = 'メールアドレスとパスワードを入力してください'; return; }
+  if(!auth){ err.textContent = 'Firebase未設定です'; return; }
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(e){
+    err.textContent = authErrMsg(e.code);
+  }
+}
+
+async function doLogout(){
+  if(!confirm('ログアウトしますか？')) return;
+  await auth.signOut();
+}
+
+async function loadMyUserDoc(uid, user){
+  const ref = db.collection('mitsumori_users').doc(uid);
+  const snap = await ref.get();
+  if(snap.exists) return snap.data();
+  const d = { name:user.email.split('@')[0], email:user.email, isAdmin:false, hidden:false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+  await ref.set(d);
+  return d;
+}
+
+function bootAppAfterAuth(){
+  (async ()=>{
+    await loadTemplates();
+    renderTemplateList();
+    renderMasterList();
+    renderMfrList();
+  })();
+}
+
+/* ========================= ログイン無し版 =========================
+   index.htmlのログイン必須版とは別に、ログイン画面自体を持たない版。
+   常にアプリ画面を表示する。あわせて firestore-open.rules（isAuth()
+   を要求しない一時ルール）を Firebase Console 側に設定する必要がある。
+========================================================= */
+document.getElementById('authScreen').style.display = 'none';
+document.getElementById('appRoot').style.display = 'block';
+document.getElementById('adminBtn').style.display = 'none';
+document.getElementById('logoutBtn').style.display = 'none';
+bootAppAfterAuth();
+
+/* ========================= 管理者パネル ========================= */
+let _adminTab = 'active';
+function openAdminModal(){
+  document.getElementById('adminModal').style.display = 'flex';
+  switchAdminTab('active');
+}
+function closeAdminModal(){
+  document.getElementById('adminModal').style.display = 'none';
+}
+document.getElementById('adminCloseBtn').addEventListener('click', closeAdminModal);
+document.getElementById('addUserConsoleBtn').addEventListener('click', ()=>{
+  const projectId = firebaseConfig.projectId;
+  const url = projectId
+    ? `https://console.firebase.google.com/project/${projectId}/authentication/users`
+    : 'https://console.firebase.google.com/';
+  window.open(url, '_blank', 'noopener');
+});
+
+async function switchAdminTab(tab){
+  _adminTab = tab;
+  document.getElementById('uatab-active').classList.toggle('active', tab==='active');
+  document.getElementById('uatab-hidden').classList.toggle('active', tab==='hidden');
+  await renderAdminUserList();
+}
+
+async function renderAdminUserList(){
+  const wrap = document.getElementById('pickerAdminBody');
+  wrap.innerHTML = '<div class="empty-state">読み込み中…</div>';
+  const snap = await db.collection('mitsumori_users').get();
+  const all = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  const list = all.filter(u => _adminTab==='hidden' ? u.hidden : !u.hidden);
+  if(list.length===0){
+    wrap.innerHTML = `<div class="empty-state">${_adminTab==='hidden' ? '非表示のユーザーはいません' : 'ユーザーがいません'}</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(u=>`
+    <div class="uitem">
+      <div>
+        <div class="un">${escapeHtml(u.name||u.email)}${u.isAdmin?'<span class="badge-admin">管理者</span>':''}${u.hidden?'<span class="badge-hidden">非表示</span>':''}</div>
+        <div class="ue">${escapeHtml(u.email||'')}</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        ${u.id===currentUser.uid ? '<span style="font-size:11px;color:var(--ink-soft);">（自分）</span>' : `
+          <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="isAdmin" data-val="${!u.isAdmin}" onclick="toggleUserField(this)">${u.isAdmin?'管理者を外す':'管理者にする'}</button>
+          <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="hidden" data-val="${!u.hidden}" onclick="toggleUserField(this)">${u.hidden?'表示に戻す':'非表示'}</button>
+        `}
+      </div>
+    </div>`).join('');
+}
+
+async function toggleUserField(btn){
+  const uid = btn.dataset.uid;
+  const field = btn.dataset.field;
+  const val = btn.dataset.val === 'true';
+  await db.collection('mitsumori_users').doc(uid).update({ [field]: val });
+  renderAdminUserList();
+}
+
+/* ========================= 共通ユーティリティ ========================= */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function yen(n){
+  return '¥' + Math.round(n||0).toLocaleString('ja-JP');
+}
+function uid(){
+  return Math.random().toString(36).slice(2,10);
+}
+
+// 新旧レスポンス形式に両対応する抽出ヘルパー（既存アプリと同一パターン）
+function extractGeminiText(d){
+  return d?.data?.candidates?.[0]?.content?.parts?.[0]?.text
+      || d?.text
+      || d?.data?.text
+      || '';
+}
+
+async function callAskAI({ prompt, mode='normal', mediaContents=null, responseSchema=null, useSearch=false }){
+  const body = { prompt, mode };
+  if(mediaContents) body.mediaContents = mediaContents;
+  if(responseSchema) body.responseSchema = responseSchema;
+  if(useSearch) body.useSearch = true;
+
+  const res = await fetch(ASK_AI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-access-key': ACCESS_KEY
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    throw new Error('AI呼び出しに失敗しました (' + res.status + ')');
+  }
+  const data = await res.json();
+  const text = extractGeminiText(data);
+  return text;
+}
+
+function safeParseJSON(text){
+  let t = (text||'').trim();
+  t = t.replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  try{ return JSON.parse(t); }catch(e){ console.error('JSON parse error', e, t); return null; }
+}
+
+/* ========================= タブ切替 ========================= */
+document.querySelectorAll('.step-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.step-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+  });
+});
+function goToPanel(name){
+  document.querySelectorAll('.step-btn').forEach(b=>b.classList.toggle('active', b.dataset.panel===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id === 'panel-' + name));
+}
+
+/* ========================= 01 依頼入力 ========================= */
+let uploadedFiles = []; // {name, base64, mimeType}
+
+document.querySelectorAll('.mode-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('.mode-chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    ['text','file','voice'].forEach(m=>{
+      document.getElementById('mode-'+m).style.display = (m===chip.dataset.mode) ? 'block' : 'none';
+    });
+  });
+});
+
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  uploadedFiles = [];
+  const files = Array.from(e.target.files || []);
+  const preview = document.getElementById('filePreview');
+  preview.textContent = '読み込み中…';
+  for(const f of files){
+    const base64 = await fileToBase64(f);
+    uploadedFiles.push({ name: f.name, base64, mimeType: f.type || 'application/octet-stream' });
+  }
+  preview.textContent = uploadedFiles.length ? ('添付: ' + uploadedFiles.map(f=>f.name).join(' / ')) : '';
+});
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>resolve(r.result.split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// 音声入力（Web Speech API）
+let recognizer = null;
+let recording = false;
+const micBtn = document.getElementById('micBtn');
+micBtn.addEventListener('click', ()=>{
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    document.getElementById('voiceStatus').textContent = 'このブラウザは音声入力に対応していません（Chrome推奨）';
+    return;
+  }
+  if(recording){
+    recognizer.stop();
+    return;
+  }
+  recognizer = new SR();
+  recognizer.lang = 'ja-JP';
+  recognizer.continuous = true;
+  recognizer.interimResults = true;
+
+  let finalText = document.getElementById('requestText').value ? document.getElementById('requestText').value + '\n' : '';
+  recognizer.onstart = ()=>{
+    recording = true;
+    micBtn.classList.add('recording');
+    micBtn.textContent = '● 録音中…タップで停止';
+    document.getElementById('voiceStatus').textContent = '聞き取り中です';
+  };
+  recognizer.onresult = (ev)=>{
+    let interim = '';
+    for(let i=ev.resultIndex; i<ev.results.length; i++){
+      const t = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) finalText += t;
+      else interim += t;
+    }
+    document.getElementById('requestText').value = finalText + interim;
+  };
+  recognizer.onerror = (ev)=>{
+    document.getElementById('voiceStatus').textContent = 'エラー: ' + ev.error;
+  };
+  recognizer.onend = ()=>{
+    recording = false;
+    micBtn.classList.remove('recording');
+    micBtn.textContent = '🎙 タップして録音開始';
+    document.getElementById('voiceStatus').textContent = '停止しました';
+  };
+  recognizer.start();
+});
+
+/* AI解析 */
+let candidateItems = [];
+
+document.getElementById('analyzeBtn').addEventListener('click', async ()=>{
+  const text = document.getElementById('requestText').value.trim();
+  const note = document.getElementById('requestNote').value.trim();
+  if(!text && uploadedFiles.length===0){
+    toast('依頼文か画像・PDFを入力してください');
+    return;
+  }
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> 解析中…';
+
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      items: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING", description: "工事・部材の項目名" },
+            spec: { type: "STRING", description: "仕様・寸法・備考" },
+            qty: { type: "NUMBER", description: "数量" },
+            unit: { type: "STRING", description: "単位（式・m2・m・箇所など）" },
+            category: { type: "STRING", description: "大工工事/建具/経理/資材/その他 など" }
+          },
+          required: ["name","qty","unit"]
+        }
+      }
+    },
+    required: ["items"]
+  };
+
+  const prompt = `あなたは建設・大工工事の見積もり担当です。以下の見積もり依頼を読み取り、見積書に必要な項目を洗い出してください。
+・数量が不明な場合は妥当な概算値を入れてください（0にしない）
+・専門用語（廻り階段、破風、鼻隠し、下地補修等）はそのまま項目名に使ってください
+・出力はJSONのみ。前置き・Markdown記法は不要です
+
+【依頼文】
+${text || '（画像・PDF添付のみ）'}
+
+【補足】
+${note || 'なし'}`;
+
+  try{
+    const mediaContents = uploadedFiles.map(f=>({ type: f.mimeType, base64: f.base64 }));
+    const raw = await callAskAI({
+      prompt,
+      mode: 'normal',
+      mediaContents: mediaContents.length ? mediaContents : null,
+      responseSchema: schema
+    });
+    const parsed = safeParseJSON(raw);
+    if(!parsed || !Array.isArray(parsed.items) || parsed.items.length===0){
+      toast('AIが項目を抽出できませんでした。依頼文を具体的にしてみてください');
+    } else {
+      candidateItems = parsed.items.map(it=>({
+        id: uid(),
+        name: it.name || '項目',
+        spec: it.spec || '',
+        qty: Number(it.qty) || 1,
+        unit: it.unit || '式',
+        category: it.category || '',
+        checked: true
+      }));
+      renderCandidates();
+      goToPanel('select');
+      toast(candidateItems.length + '件の項目を抽出しました');
+    }
+  }catch(err){
+    console.error(err);
+    toast('AI解析でエラーが発生しました');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'AIに解析させる →';
+  }
+});
+
+/* ========================= 02 項目選定 ========================= */
+function renderCandidates(){
+  const wrap = document.getElementById('candidateList');
+  if(candidateItems.length===0){
+    wrap.innerHTML = '<div class="empty-state"><span class="mark">未解析</span>ステップ01で依頼を解析すると、ここに項目候補が並びます</div>';
+    return;
+  }
+  wrap.innerHTML = candidateItems.map(it=>`
+    <div class="item-row">
+      <input type="checkbox" ${it.checked?'checked':''} onchange="toggleCandidate('${it.id}', this.checked)">
+      <div class="item-main">
+        <div class="name">${escapeHtml(it.name)} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">${escapeHtml(it.category||'')}</span></div>
+        <div class="spec">${escapeHtml(it.spec||'')}</div>
+        <div class="meta">
+          <input type="number" value="${it.qty}" min="0" step="0.1" onchange="updateCandidate('${it.id}','qty',this.value)"> 
+          <input type="text" value="${escapeHtml(it.unit)}" onchange="updateCandidate('${it.id}','unit',this.value)">
+        </div>
+      </div>
+      <button class="add-one" title="この項目だけ見積書に積み上げる" onclick="addSingleToEstimate('${it.id}')">＋</button>
+    </div>
+  `).join('');
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toggleCandidate(id, checked){
+  const it = candidateItems.find(x=>x.id===id);
+  if(it) it.checked = checked;
+}
+function updateCandidate(id, field, val){
+  const it = candidateItems.find(x=>x.id===id);
+  if(it) it[field] = (field==='qty') ? Number(val) : val;
+}
+document.getElementById('selectAllBtn').addEventListener('click', ()=>{
+  candidateItems.forEach(it=>it.checked=true); renderCandidates();
+});
+document.getElementById('clearAllBtn').addEventListener('click', ()=>{
+  candidateItems.forEach(it=>it.checked=false); renderCandidates();
+});
+document.getElementById('addManualBtn').addEventListener('click', ()=>{
+  const name = prompt('項目名を入力してください');
+  if(!name) return;
+  candidateItems.push({ id: uid(), name, spec:'', qty:1, unit:'式', category:'手入力', checked:true });
+  renderCandidates();
+});
+
+/* 個別「追加」ボタン：候補1件だけを即座に見積明細へ積み上げる */
+function addSingleToEstimate(id){
+  const it = candidateItems.find(x=>x.id===id);
+  if(!it) return;
+  addToEstimate([it]);
+  toast('「' + it.name + '」を見積書に追加しました');
+}
+
+document.getElementById('toOutputBtn').addEventListener('click', ()=>{
+  const chosen = candidateItems.filter(it=>it.checked);
+  if(chosen.length===0){ toast('項目を選択してください'); return; }
+  addToEstimate(chosen);
+  goToPanel('output');
+});
+
+/* ========================= 03 見積明細・単価・出力 ========================= */
+let estimateItems = []; // {id, name, spec, qty, unit, unitPrice, priceSource}
+
+function addToEstimate(items){
+  items.forEach(it=>{
+    estimateItems.push({
+      id: uid(),
+      name: it.name,
+      spec: it.spec || '',
+      qty: it.qty || 1,
+      unit: it.unit || '式',
+      category: it.category || '',
+      unitPrice: 0,
+      priceSource: null
+    });
+  });
+  renderEstimate();
+}
+
+function renderEstimate(){
+  const wrap = document.getElementById('estimateTableWrap');
+  const totalsBox = document.getElementById('totalsBox');
+  if(estimateItems.length===0){
+    wrap.innerHTML = '<div class="empty-state"><span class="mark">明細なし</span>ステップ02で項目を選んでください</div>';
+    totalsBox.style.display = 'none';
+    return;
+  }
+  totalsBox.style.display = 'block';
+  const rows = estimateItems.map(it=>{
+    const srcBadge = it.priceSource==='master' ? '<span class="price-src master">単価表</span>'
+      : it.priceSource==='ai' ? '<span class="price-src ai">AI概算</span>'
+      : it.priceSource==='manual' ? '<span class="price-src manual">手入力</span>'
+      : it.priceSource==='catalog' ? '<span class="price-src catalog">メーカー単価表</span>' : '';
+    return `
+    <tr>
+      <td>${escapeHtml(it.name)}<div style="font-size:11px;color:var(--ink-soft);">${escapeHtml(it.spec)}</div></td>
+      <td class="num"><input type="number" style="width:56px;" value="${it.qty}" onchange="updateEstimate('${it.id}','qty',this.value)"></td>
+      <td>${escapeHtml(it.unit)}</td>
+      <td class="num"><input type="number" style="width:84px;" value="${it.unitPrice}" onchange="updateEstimate('${it.id}','unitPrice',this.value)">${srcBadge}</td>
+      <td class="num">${yen(it.qty*it.unitPrice)}</td>
+      <td><button class="btn btn-ghost" style="padding:4px 7px; font-size:11px;" onclick="openCatalogPicker('${it.id}')">🏷</button> <button class="del" onclick="removeEstimate('${it.id}')">✕</button></td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `
+    <table class="est-table">
+      <thead><tr><th>項目</th><th class="num">数量</th><th>単位</th><th class="num">単価</th><th class="num">金額</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  computeTotals();
+}
+function updateEstimate(id, field, val){
+  const it = estimateItems.find(x=>x.id===id);
+  if(!it) return;
+  it[field] = Number(val);
+  if(field==='unitPrice') it.priceSource = 'manual';
+  renderEstimate();
+}
+function removeEstimate(id){
+  estimateItems = estimateItems.filter(x=>x.id!==id);
+  renderEstimate();
+}
+function computeTotals(){
+  const subtotal = estimateItems.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const tax = Math.round(subtotal*0.1);
+  document.getElementById('subtotalVal').textContent = yen(subtotal);
+  document.getElementById('taxVal').textContent = yen(tax);
+  document.getElementById('grandVal').textContent = yen(subtotal+tax);
+}
+
+/* ========================= 単価表ピッカー（ジャンル→メーカー→品目） ========================= */
+let _pickerState = { estimateItemId:null, step:'genre', genre:null, manufacturer:null, catalog:[] };
+
+async function openCatalogPicker(estimateItemId){
+  if(!db){ toast('Firebase未設定のためメーカー単価表がありません'); return; }
+  document.getElementById('pickerModal').style.display = 'flex';
+  document.getElementById('pickerModalBody').innerHTML = '<div class="empty-state">読み込み中…</div>';
+  document.getElementById('pickerBackBtn').style.display = 'none';
+  const catalog = await loadCatalogItems();
+  _pickerState = { estimateItemId, step:'genre', genre:null, manufacturer:null, catalog };
+  if(catalog.length===0){
+    document.getElementById('pickerModalBody').innerHTML = '<div class="empty-state"><span class="mark">未登録</span>ステップ06でメーカー単価表を取り込んでください</div>';
+    return;
+  }
+  renderPickerStep();
+}
+function closePickerModal(){
+  document.getElementById('pickerModal').style.display = 'none';
+}
+function renderPickerStep(){
+  const title = document.getElementById('pickerModalTitle');
+  const backBtn = document.getElementById('pickerBackBtn');
+  const body = document.getElementById('pickerModalBody');
+  const { step, genre, manufacturer, catalog } = _pickerState;
+
+  if(step==='genre'){
+    title.textContent = '単価表から選ぶ：ジャンル';
+    backBtn.style.display = 'none';
+    const genres = {};
+    catalog.forEach(it=>{ genres[it.genre] = (genres[it.genre]||0)+1; });
+    body.innerHTML = `<div class="picker-chip-grid">${Object.keys(genres).map(g=>`
+      <div class="picker-chip" data-genre="${escapeHtml(g)}" onclick="pickerSelectGenre(this.dataset.genre)">${escapeHtml(g)}<span class="cnt">(${genres[g]})</span></div>
+    `).join('')}</div>`;
+  } else if(step==='manufacturer'){
+    title.textContent = `単価表から選ぶ：${genre} のメーカー`;
+    backBtn.style.display = '';
+    const mfrs = {};
+    catalog.filter(it=>it.genre===genre).forEach(it=>{ mfrs[it.manufacturer] = (mfrs[it.manufacturer]||0)+1; });
+    body.innerHTML = `<div class="picker-chip-grid">${Object.keys(mfrs).map(m=>`
+      <div class="picker-chip" data-mfr="${escapeHtml(m)}" onclick="pickerSelectManufacturer(this.dataset.mfr)">${escapeHtml(m)}<span class="cnt">(${mfrs[m]})</span></div>
+    `).join('')}</div>`;
+  } else if(step==='item'){
+    title.textContent = `単価表から選ぶ：${genre} / ${manufacturer}`;
+    backBtn.style.display = '';
+    const list = catalog.filter(it=>it.genre===genre && it.manufacturer===manufacturer);
+    body.innerHTML = list.map(it=>`
+      <div class="picker-item-row" data-item-id="${it.id}" onclick="pickerSelectItem(this.dataset.itemId)">
+        <div>
+          <div class="name">${escapeHtml(it.itemName)}</div>
+          ${it.grade ? `<div class="grade">${escapeHtml(it.grade)}</div>` : ''}
+        </div>
+        <div class="price">${yen(it.unitPrice)}</div>
+      </div>`).join('');
+  }
+}
+function pickerSelectGenre(genre){
+  _pickerState.step = 'manufacturer';
+  _pickerState.genre = genre;
+  renderPickerStep();
+}
+function pickerSelectManufacturer(mfr){
+  _pickerState.step = 'item';
+  _pickerState.manufacturer = mfr;
+  renderPickerStep();
+}
+function pickerSelectItem(itemId){
+  const it = _pickerState.catalog.find(x=>x.id===itemId);
+  if(!it) return;
+  const est = estimateItems.find(x=>x.id===_pickerState.estimateItemId);
+  if(est){
+    est.name = it.itemName + (it.grade ? `（${it.grade}）` : '');
+    est.unit = it.unit || est.unit;
+    est.unitPrice = it.unitPrice;
+    est.priceSource = 'catalog';
+    renderEstimate();
+    toast('「' + it.itemName + '」の単価を反映しました');
+  }
+  closePickerModal();
+}
+function pickerGoBack(){
+  if(_pickerState.step==='item'){ _pickerState.step='manufacturer'; }
+  else if(_pickerState.step==='manufacturer'){ _pickerState.step='genre'; }
+  renderPickerStep();
+}
+document.getElementById('pickerBackBtn').addEventListener('click', pickerGoBack);
+document.getElementById('pickerCloseBtn').addEventListener('click', closePickerModal);
+
+/* 単価の一括引き当て：Firestore単価表 → 見つからなければAI概算 */
+document.getElementById('autoPriceBtn').addEventListener('click', async ()=>{
+  if(estimateItems.length===0){ toast('明細がありません'); return; }
+  const btn = document.getElementById('autoPriceBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> 単価を引き当て中…';
+
+  try{
+    const master = await loadMasterList();
+    const needsAI = [];
+    estimateItems.forEach(it=>{
+      const hit = master.find(m => it.name.includes(m.name) || m.name.includes(it.name));
+      if(hit){
+        it.unitPrice = hit.price;
+        it.priceSource = 'master';
+      } else {
+        needsAI.push(it);
+      }
+    });
+    renderEstimate();
+
+    if(needsAI.length > 0){
+      const schema = {
+        type: "OBJECT",
+        properties: {
+          prices: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                name: { type: "STRING" },
+                unitPrice: { type: "NUMBER", description: "円/単位の概算単価（税抜）" }
+              },
+              required: ["name","unitPrice"]
+            }
+          }
+        },
+        required: ["prices"]
+      };
+      const prompt = `以下は日本の建設・大工工事の見積項目です。一般的な相場感（税抜・円）で単価を概算してください。単価表に無い項目のみです。JSONのみ出力してください。\n\n` +
+        needsAI.map(it=>`- ${it.name}（${it.spec||'仕様指定なし'}、単位:${it.unit}）`).join('\n');
+
+      const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
+      const parsed = safeParseJSON(raw);
+      if(parsed && Array.isArray(parsed.prices)){
+        parsed.prices.forEach(p=>{
+          const it = needsAI.find(x=>x.name===p.name) || needsAI.find(x=>x.name.includes(p.name)||p.name.includes(x.name));
+          if(it){ it.unitPrice = Number(p.unitPrice)||0; it.priceSource = 'ai'; }
+        });
+      }
+      renderEstimate();
+    }
+    toast('単価の引き当てが完了しました');
+  }catch(err){
+    console.error(err);
+    toast('単価引き当てでエラーが発生しました');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '単価を一括で引き当てる（単価表→AI概算）';
+  }
+});
+
+/* ========================= 04 単価マスタ（Firestore） ========================= */
+async function loadMasterList(){
+  if(!db) return [];
+  const snap = await db.collection('mitsumori_price_master').get();
+  return snap.docs.map(d=>({ id: d.id, ...d.data() }));
+}
+async function renderMasterList(){
+  const wrap = document.getElementById('masterList');
+  if(!db){
+    wrap.innerHTML = '<div class="empty-state">Firebase未設定のため単価表は保存されません</div>';
+    return;
+  }
+  const list = await loadMasterList();
+  if(list.length===0){
+    wrap.innerHTML = '<div class="empty-state"><span class="mark">未登録</span>「品目を追加」から単価を登録してください</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(m=>`
+    <div class="master-row">
+      <input type="text" value="${escapeHtml(m.name)}" onchange="updateMaster('${m.id}','name',this.value)">
+      <input type="number" value="${m.price}" onchange="updateMaster('${m.id}','price',this.value)">
+      <input type="text" value="${escapeHtml(m.unit||'')}" onchange="updateMaster('${m.id}','unit',this.value)">
+      <button class="del" onclick="deleteMaster('${m.id}')">✕</button>
+    </div>`).join('');
+}
+async function updateMaster(id, field, val){
+  if(!db) return;
+  const v = (field==='price') ? Number(val) : val;
+  await db.collection('mitsumori_price_master').doc(id).update({ [field]: v });
+}
+async function deleteMaster(id){
+  if(!db) return;
+  await db.collection('mitsumori_price_master').doc(id).delete();
+  renderMasterList();
+}
+document.getElementById('addMasterBtn').addEventListener('click', async ()=>{
+  if(!db){ toast('Firebase未設定です'); return; }
+  await db.collection('mitsumori_price_master').add({ name:'新しい品目', price:0, unit:'式' });
+  renderMasterList();
+});
+
+/* Excel単価表インポート */
+document.getElementById('masterExcelInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('masterImportStatus');
+  statusEl.textContent = '読み込み中…';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1 });
+    const dataRows = rows.slice(1).filter(r=>r && r[0]);
+    if(!db){
+      statusEl.textContent = 'Firebase未設定のため取り込めません（' + dataRows.length + '件検出）';
+      return;
+    }
+    const batch = db.batch();
+    dataRows.forEach(r=>{
+      const ref = db.collection('mitsumori_price_master').doc();
+      batch.set(ref, {
+        name: String(r[0]||'').trim(),
+        price: Number(r[1])||0,
+        unit: String(r[2]||'式').trim()
+      });
+    });
+    await batch.commit();
+    statusEl.textContent = dataRows.length + '件を単価表に取り込みました';
+    renderMasterList();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '取り込みに失敗しました（列構成をご確認ください）';
+  }
+});
+
+/* ========================= 06 メーカー単価表 ========================= */
+const GENRE_LIST = ['キッチン','浴室','トイレ','洗面所','フローリング','建具','外壁','屋根','その他'];
+
+async function loadCatalogItems(){
+  if(!db) return [];
+  const snap = await db.collection('mitsumori_catalog_items').get();
+  return snap.docs.map(d=>({ id:d.id, ...d.data() }));
+}
+
+async function renderMfrList(){
+  const wrap = document.getElementById('mfrList');
+  if(!db){
+    wrap.innerHTML = '<div class="empty-state">Firebase未設定のためメーカー単価表は保存されません</div>';
+    return;
+  }
+  const items = await loadCatalogItems();
+  if(items.length===0){
+    wrap.innerHTML = '<div class="empty-state"><span class="mark">未登録</span>上のフォームからメーカー単価表を取り込んでください</div>';
+    return;
+  }
+  const byMfr = {};
+  items.forEach(it=>{ (byMfr[it.manufacturer] = byMfr[it.manufacturer]||[]).push(it); });
+  wrap.innerHTML = `
+    <div class="mfr-row head"><div>メーカー</div><div>件数</div><div></div></div>
+    ${Object.keys(byMfr).map(name=>`
+      <div class="mfr-row">
+        <div>${escapeHtml(name)}</div>
+        <div>${byMfr[name].length}件</div>
+        <button class="del" data-mfr="${escapeHtml(name)}" onclick="deleteMfr(this.dataset.mfr)">✕</button>
+      </div>`).join('')}`;
+}
+
+async function deleteMfr(name){
+  if(!db) return;
+  if(!confirm('「' + name + '」の単価表を削除しますか？')) return;
+  const snap = await db.collection('mitsumori_catalog_items').where('manufacturer','==',name).get();
+  const batch = db.batch();
+  snap.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+  renderMfrList();
+}
+
+/* Excelメーカー単価表の取り込み：パース → AIがジャンル/グレード判定 → Firestore保存 */
+document.getElementById('mfrExcelInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('mfrImportStatus');
+  const mfrName = document.getElementById('mfrNameInput').value.trim() || file.name.replace(/\.[^.]+$/,'');
+  if(!db){
+    statusEl.textContent = 'Firebase未設定のため取り込めません';
+    e.target.value = '';
+    return;
+  }
+  statusEl.textContent = '読み込み中…';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1 });
+    const dataRows = rows.slice(1)
+      .filter(r=>r && r[0])
+      .map(r=>({ name:String(r[0]||'').trim(), price:Number(r[1])||0, unit:String(r[2]||'式').trim() }));
+    if(dataRows.length===0){
+      statusEl.textContent = '品目を検出できませんでした（列構成をご確認ください）';
+      return;
+    }
+
+    const CHUNK = 35;
+    const classified = [];
+    for(let i=0; i<dataRows.length; i+=CHUNK){
+      const chunk = dataRows.slice(i, i+CHUNK);
+      statusEl.textContent = `AIがジャンルを判定中…（${Math.min(i+CHUNK,dataRows.length)}/${dataRows.length}件）`;
+      const schema = {
+        type:"OBJECT",
+        properties:{ items:{ type:"ARRAY", items:{ type:"OBJECT", properties:{
+          index:{ type:"NUMBER", description:"品目リストの番号" },
+          genre:{ type:"STRING", description:`次のいずれか1つを必ずそのまま使う: ${GENRE_LIST.join('/')}` },
+          grade:{ type:"STRING", description:"グレード・シリーズ名（品目名から読み取れなければ空文字）" }
+        }, required:["index","genre"] } } },
+        required:["items"]
+      };
+      const prompt = `あなたは建設資材のカタログ分類の専門家です。以下は「${mfrName}」の単価表に含まれる品目一覧です。
+各品目を、次のジャンルのいずれか1つに分類してください（このリストの表記をそのまま使うこと）:
+${GENRE_LIST.join('・')}
+
+また、品目名からグレード・シリーズ名が読み取れる場合は grade に記載してください（読み取れなければ空文字）。
+
+【品目リスト】
+${chunk.map((it,idx)=>`${idx}: ${it.name}`).join('\n')}
+
+出力はJSONのみ。前置き・Markdown記法は不要です。`;
+      try{
+        const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
+        const parsed = safeParseJSON(raw);
+        const results = (parsed && Array.isArray(parsed.items)) ? parsed.items : [];
+        chunk.forEach((it,idx)=>{
+          const r = results.find(x=>Number(x.index)===idx);
+          const genre = (r && GENRE_LIST.includes(r.genre)) ? r.genre : 'その他';
+          const grade = (r && r.grade) ? String(r.grade).trim() : '';
+          classified.push({ ...it, genre, grade });
+        });
+      }catch(err){
+        console.error('genre classify error', err);
+        chunk.forEach(it=>classified.push({ ...it, genre:'その他', grade:'' }));
+      }
+    }
+
+    statusEl.textContent = 'Firestoreに保存中…';
+    const batch = db.batch();
+    classified.forEach(it=>{
+      const ref = db.collection('mitsumori_catalog_items').doc();
+      batch.set(ref, {
+        manufacturer: mfrName,
+        genre: it.genre,
+        itemName: it.name,
+        grade: it.grade,
+        unitPrice: it.price,
+        unit: it.unit,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    statusEl.textContent = `「${mfrName}」の単価表 ${classified.length}件を取り込みました`;
+    document.getElementById('mfrExcelInput').value = '';
+    document.getElementById('mfrNameInput').value = '';
+    renderMfrList();
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '取り込みに失敗しました（列構成をご確認ください）';
+  }
+});
+
+/* ========================= 05 Excel書式管理 ========================= */
+const DEFAULT_TEMPLATES = [
+  {
+    name: '標準見積書',
+    desc: '品名・数量・単位・単価・金額の一般的な様式',
+    headerTitle: '御 見 積 書',
+    columns: ['品名・仕様','数量','単位','単価','金額']
+  },
+  {
+    name: '詳細内訳付き見積書',
+    desc: '工種カテゴリ別の内訳欄つき。大型改修向け',
+    headerTitle: '御 見 積 書（内訳付）',
+    columns: ['工種','品名・仕様','数量','単位','単価','金額']
+  },
+  {
+    name: '簡易見積書',
+    desc: '式一括表記。小工事・急ぎの提示に',
+    headerTitle: 'お見積り',
+    columns: ['内容','金額']
+  }
+];
+let templates = DEFAULT_TEMPLATES.map((t,i)=>({ id:'local'+i, ...t }));
+let selectedTemplateId = templates[0].id;
+
+/* Firestoreから書式一覧を読み込み。未登録ならデフォルト3種をseedする */
+async function loadTemplates(){
+  if(!db) return;
+  const snap = await db.collection('mitsumori_templates').get();
+  if(snap.empty){
+    const batch = db.batch();
+    DEFAULT_TEMPLATES.forEach(t=>batch.set(db.collection('mitsumori_templates').doc(), t));
+    await batch.commit();
+    const snap2 = await db.collection('mitsumori_templates').get();
+    templates = snap2.docs.map(d=>({ id:d.id, ...d.data() }));
+  } else {
+    templates = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  }
+  selectedTemplateId = templates[0].id;
+}
+
+function renderTemplateList(){
+  const wrap = document.getElementById('templateList');
+  wrap.innerHTML = templates.map(t=>`
+    <div class="template-card ${t.id===selectedTemplateId?'selected':''}" onclick="selectTemplate('${t.id}')">
+      <div class="t-name">${escapeHtml(t.name)}</div>
+      <div class="t-desc">${escapeHtml(t.desc)}</div>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <button class="btn btn-ghost" style="padding:6px 10px; font-size:11.5px;" onclick="event.stopPropagation(); editTemplate('${t.id}')">編集</button>
+        <button class="btn btn-danger" style="padding:6px 10px; font-size:11.5px;" onclick="event.stopPropagation(); deleteTemplate('${t.id}')">削除</button>
+      </div>
+    </div>`).join('');
+  renderTemplatePickerMini();
+}
+function renderTemplatePickerMini(){
+  const wrap = document.getElementById('templatePickerMini');
+  wrap.innerHTML = `<select id="templateSelectMini">${templates.map(t=>`<option value="${t.id}" ${t.id===selectedTemplateId?'selected':''}>${escapeHtml(t.name)}</option>`).join('')}</select>`;
+  document.getElementById('templateSelectMini').addEventListener('change', (e)=>{
+    selectedTemplateId = e.target.value;
+  });
+}
+function selectTemplate(id){
+  selectedTemplateId = id;
+  renderTemplateList();
+}
+async function editTemplate(id){
+  const t = templates.find(x=>x.id===id);
+  if(!t) return;
+  const newTitle = prompt('見積書のヘッダー文言', t.headerTitle);
+  if(newTitle!==null) t.headerTitle = newTitle;
+  const newCols = prompt('列構成をカンマ区切りで入力', t.columns.join(','));
+  if(newCols!==null) t.columns = newCols.split(',').map(s=>s.trim()).filter(Boolean);
+  if(db) await db.collection('mitsumori_templates').doc(t.id).update({ headerTitle:t.headerTitle, columns:t.columns });
+  renderTemplateList();
+}
+async function deleteTemplate(id){
+  if(templates.length<=1){ toast('最低1つは残してください'); return; }
+  if(db) await db.collection('mitsumori_templates').doc(id).delete();
+  templates = templates.filter(t=>t.id!==id);
+  if(selectedTemplateId===id) selectedTemplateId = templates[0].id;
+  renderTemplateList();
+}
+document.getElementById('addTemplateBtn').addEventListener('click', async ()=>{
+  const name = prompt('新しい書式の名前');
+  if(!name) return;
+  const t = { name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'] };
+  let id = uid();
+  if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
+  templates.push({ id, ...t });
+  selectedTemplateId = id;
+  renderTemplateList();
+});
+
+/* Excel見積書から書式を取り込み */
+document.getElementById('templateExcelInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('templateImportStatus');
+  statusEl.textContent = '読み込み中…';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type:'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1 });
+    const nonEmpty = r => (r||[]).filter(c=>c!==undefined && c!==null && String(c).trim()!=='');
+    const titleRowIdx = rows.findIndex(r=>nonEmpty(r).length>0);
+    const headerTitle = titleRowIdx>=0 ? String(nonEmpty(rows[titleRowIdx])[0]).trim() : file.name.replace(/\.[^.]+$/,'');
+
+    let columns = null;
+    for(let i=titleRowIdx+1; i<Math.min(rows.length, titleRowIdx+12); i++){
+      const cells = nonEmpty(rows[i]);
+      const looksLikeHeader = cells.length>=3 && cells.length<=8 && cells.every(c=>String(c).trim().length<=20);
+      if(looksLikeHeader){ columns = cells.map(c=>String(c).trim()); break; }
+    }
+    if(!columns) columns = ['品名・仕様','数量','単位','単価','金額'];
+
+    const name = file.name.replace(/\.[^.]+$/,'');
+    const t = { name, desc:'アップロードされた書式', headerTitle, columns };
+    let id = uid();
+    if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
+    templates.push({ id, ...t });
+    selectedTemplateId = id;
+    renderTemplateList();
+    statusEl.textContent = `「${name}」として取り込みました（列: ${columns.join('・')}）`;
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '取り込みに失敗しました（内容をご確認ください）';
+  }
+});
+
+/* ========================= 出力：Excel / PDF ========================= */
+/* 見積書の列見出し（工種・品名・仕様/数量/単位/単価/金額 等）を見出し文言から判別し、
+   任意の列構成のテンプレートでも列がズレずに出力できるようにする */
+function buildExcelRow(it, columns){
+  const amount = it.qty*it.unitPrice;
+  const hasQtyCol = columns.some(c=>c.includes('数量'));
+  const hasUnitCol = columns.some(c=>c.includes('単位'));
+  const nameText = (!hasQtyCol || !hasUnitCol)
+    ? `${it.name}${it.spec ? '（'+it.spec+'）' : ''} ${it.qty}${it.unit}`
+    : `${it.name}${it.spec ? ' '+it.spec : ''}`;
+  let nameUsed = false;
+  return columns.map(col=>{
+    if(col.includes('数量')) return it.qty;
+    if(col.includes('単位')) return it.unit;
+    if(col.includes('単価')) return it.unitPrice;
+    if(col.includes('金額')) return amount;
+    if(col.includes('工種')) return it.category || '';
+    if(!nameUsed){ nameUsed = true; return nameText; }
+    return '';
+  });
+}
+document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
+  if(estimateItems.length===0){ toast('明細がありません'); return; }
+  const t = templates.find(x=>x.id===selectedTemplateId) || templates[0];
+  const project = document.getElementById('projectName').value || '（案件名未入力）';
+  const client = document.getElementById('clientName').value || '';
+  const subtotal = estimateItems.reduce((s,it)=>s+it.qty*it.unitPrice,0);
+  const tax = Math.round(subtotal*0.1);
+
+  const aoa = [];
+  aoa.push([t.headerTitle]);
+  aoa.push([]);
+  aoa.push(['案件名', project]);
+  aoa.push(['お客様', client]);
+  aoa.push(['発行元', 'Hearts House Inc.']);
+  aoa.push(['発行日', new Date().toLocaleDateString('ja-JP')]);
+  aoa.push([]);
+  aoa.push(t.columns);
+  estimateItems.forEach(it=>{
+    aoa.push(buildExcelRow(it, t.columns));
+  });
+  aoa.push([]);
+  const amountColIdx = t.columns.findIndex(c=>c.includes('金額'));
+  const totalsColIdx = amountColIdx>=0 ? amountColIdx : t.columns.length-1;
+  const totalsRow = (label, val)=>{
+    const row = new Array(t.columns.length).fill('');
+    row[0] = label;
+    row[totalsColIdx] = val;
+    return row;
+  };
+  aoa.push(totalsRow('小計', subtotal));
+  aoa.push(totalsRow('消費税(10%)', tax));
+  aoa.push(totalsRow('合計', subtotal+tax));
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = t.columns.map(()=>({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '見積書');
+  const filename = `見積書_${project.replace(/[\\/:*?"<>|]/g,'')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  toast('Excelを出力しました');
+
+  saveEstimateHistory(project, client, subtotal+tax);
+});
+
+document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
+  if(estimateItems.length===0){ toast('明細がありません'); return; }
+  window.print();
+});
+
+async function saveEstimateHistory(project, client, total){
+  if(!db) return;
+  try{
+    await db.collection('mitsumori_history').add({
+      project, client, total,
+      items: estimateItems,
+      templateId: selectedTemplateId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){ console.error('history save error', e); }
+}
+
+/* 初期化は認証状態確定後（onAuthStateChanged / Firebase未設定時のフォールバック）に
+   bootAppAfterAuth() から呼び出される */
+
+/* ========================= PWA: Service Worker登録 ========================= */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('SW registration failed', err));
+  });
+}
+</script>
+</body>
+</html>
