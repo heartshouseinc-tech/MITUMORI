@@ -305,7 +305,7 @@
   <p>依頼を解析し、単価をあて、見積書に仕立てる</p>
   <div class="no-print" style="position:absolute; top:16px; right:16px; display:flex; gap:6px;">
     <button class="btn btn-ghost" id="adminBtn" style="display:none; padding:7px 10px; font-size:12px;" onclick="openAdminModal()">⚙️ 管理</button>
-    <button class="btn btn-ghost" style="padding:7px 10px; font-size:12px;" onclick="doLogout()">ログアウト</button>
+    <button class="btn btn-ghost" id="logoutBtn" style="padding:7px 10px; font-size:12px;" onclick="doLogout()">ログアウト</button>
   </div>
 </header>
 
@@ -590,37 +590,16 @@ function bootAppAfterAuth(){
   })();
 }
 
-if(auth){
-  auth.onAuthStateChanged(async (user)=>{
-    if(user){
-      currentUser = user;
-      // Firestore側の読み書きで何らかのエラー（ルール未反映・一時的な通信障害など）が
-      // 起きても、認証自体は成功しているのでアプリ画面には進める（ログイン画面に
-      // 固まったまま戻れなくなる事態を防ぐ）
-      let profile = { isAdmin:false };
-      try{
-        profile = await loadMyUserDoc(user.uid, user);
-      }catch(e){
-        console.error('loadMyUserDoc error', e);
-        toast('ユーザー情報の読み込みに失敗しました（管理者にご連絡ください）');
-      }
-      currentUserIsAdmin = !!profile.isAdmin;
-      document.getElementById('adminBtn').style.display = currentUserIsAdmin ? '' : 'none';
-      document.getElementById('authScreen').style.display = 'none';
-      document.getElementById('appRoot').style.display = 'block';
-      bootAppAfterAuth();
-    } else {
-      currentUser = null;
-      currentUserIsAdmin = false;
-      document.getElementById('authScreen').style.display = 'flex';
-      document.getElementById('appRoot').style.display = 'none';
-    }
-  });
-} else {
-  // Firebase未設定：ログイン不要でそのままアプリを使わせる（既存の graceful degradation を維持）
-  document.getElementById('appRoot').style.display = 'block';
-  bootAppAfterAuth();
-}
+/* ========================= ログイン無し版 =========================
+   index.htmlのログイン必須版とは別に、ログイン画面自体を持たない版。
+   常にアプリ画面を表示する。あわせて firestore-open.rules（isAuth()
+   を要求しない一時ルール）を Firebase Console 側に設定する必要がある。
+========================================================= */
+document.getElementById('authScreen').style.display = 'none';
+document.getElementById('appRoot').style.display = 'block';
+document.getElementById('adminBtn').style.display = 'none';
+document.getElementById('logoutBtn').style.display = 'none';
+bootAppAfterAuth();
 
 /* ========================= 管理者パネル ========================= */
 let _adminTab = 'active';

@@ -1,0 +1,247 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() { return request.auth != null; }
+    function isAdmin() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+    function isMitsumoriAdmin() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    match /users/{uid} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow update: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAdmin();
+      match /knowledge/{kId} {
+        allow read, write: if isOwner(uid);
+      }
+      match /calc_logic/{kId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /reports/{yearMonth}/{uid}/{dayKey} {
+      allow read: if isAuth();
+      allow write: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAuth() && (request.auth.uid == uid || isAdmin());
+    }
+
+    match /rooms/{roomId} {
+      allow read, write: if isAuth();
+      match /messages/{msgId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+        allow update: if isAuth();
+        allow delete: if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+      }
+    }
+
+    match /dms/{dmId} {
+      allow read, write: if isAuth() && request.auth.uid in resource.data.participants;
+      allow create: if isAuth() && request.auth.uid in request.resource.data.participants;
+      match /messages/{msgId} {
+        allow read: if isAuth();
+        allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+        allow update: if isAuth();
+        allow delete: if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+      }
+    }
+
+    match /keiba_races/{raceId} {
+      allow read: if true;
+      allow write: if isAuth();
+      match /horses/{horseId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+    }
+    match /keiba_bankroll/{uid} {
+      allow read, write: if isOwner(uid);
+      match /records/{recordId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /drillRecords/{recordId} {
+      allow read: if isAuth() && resource.data.uid == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+    match /library/{bookId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /game_rooms/{roomId} {
+      allow read, write: if isAuth();
+      match /chat/{msgId} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    match /forge_sessions/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+    match /forge_history/{uid} {
+      allow read, write: if isOwner(uid);
+      match /items/{itemId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /calc_library/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    match /einstein_chat/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /narikiri_chat/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /patterns/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /zeimu_journals/{uid} {
+      allow read, write: if isOwner(uid);
+      match /entries/{entryId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    match /shogi_rooms/{roomId} {
+      allow read, write: if isAuth();
+    }
+    match /kifu/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /tools/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /tool_master/{docId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ══ NEW: NANPA ROOM ══
+    match /nanpa_rooms/{roomId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAuth() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      match /members/{uid} {
+        allow read, write: if isAuth();
+      }
+      match /messages/{msgId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update: if isAuth();
+        allow delete: if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+      }
+      match /typing/{uid} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // ══ NEW: LIFE ROOM ══
+    match /life_rooms/{roomId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAuth() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      match /members/{uid} {
+        allow read, write: if isAuth();
+      }
+      match /messages/{msgId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update: if isAuth();
+        allow delete: if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+      }
+      match /typing/{uid} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // ══ NEW: LIFE RANKING ══
+    match /life_rankings/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /rateLimitIp/{docId} {
+      allow read, write: if false;
+    }
+    match /rateLimitUser/{docId} {
+      allow read, write: if false;
+    }
+
+    // ══ NEW: WANDERAI TOUR ROOMS（複数人同期ツアー） ══
+    match /tour_rooms/{roomId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+      match /members/{uid} {
+        allow read, write: if true;
+      }
+      match /messages/{msgId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
+      }
+    }
+
+    // ══ MITUMORI（見積AI帳場）── index-open.html用の一時オープン版 ══
+    // index-open.html はログインしない（request.auth が常にnull）ため、
+    // isAuth() を要求せず誰でも読み書きできるようにしている。
+    // ログインを復旧したら、本来の firestore.rules（isAuth()必須）に戻すこと。
+    match /mitsumori_users/{uid} {
+      allow read, write: if true;
+    }
+    match /mitsumori_price_master/{docId} {
+      allow read, write: if true;
+    }
+    match /mitsumori_catalog_items/{docId} {
+      allow read, write: if true;
+    }
+    match /mitsumori_templates/{docId} {
+      allow read, write: if true;
+    }
+    match /mitsumori_history/{docId} {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
