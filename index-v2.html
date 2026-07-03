@@ -431,6 +431,12 @@
   <section class="panel" id="panel-output">
     <div class="card">
       <h2><span class="tag">03</span>見積明細</h2>
+      <label class="field-label">単価モード（この案件の方針）</label>
+      <div class="input-mode-row" id="priceModeRow">
+        <div class="mode-chip" data-mode="confirmed" onclick="setPriceMode('confirmed')">現場確定</div>
+        <div class="mode-chip" data-mode="deferred" onclick="setPriceMode('deferred')">PC後決め</div>
+        <div class="mode-chip" data-mode="ai_provisional" onclick="setPriceMode('ai_provisional')">AI仮単価</div>
+      </div>
       <div id="estimateTableWrap">
         <div class="empty-state"><span class="mark">明細なし</span>ステップ02で項目を選んでください</div>
       </div>
@@ -647,6 +653,7 @@ let _activeCaseUnsub = null;
 let _casesListUnsub = null;
 let _caseSaveTimer = null;
 let _allCases = [];
+let currentCasePriceMode = 'confirmed'; // 'confirmed' | 'deferred' | 'ai_provisional'
 
 function calcTotals(items){
   const subtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
@@ -766,6 +773,8 @@ function openCase(caseId, isNew){
   activeCaseId = caseId;
   candidateItems = [];
   estimateItems = [];
+  currentCasePriceMode = 'confirmed';
+  updatePriceModeUI();
   renderCandidates();
   renderEstimate();
   showWizardView();
@@ -774,6 +783,8 @@ function openCase(caseId, isNew){
   _activeCaseUnsub = db.collection('mitsumori_cases').doc(caseId).onSnapshot(snap=>{
     if(!snap.exists) return;
     const data = snap.data();
+    currentCasePriceMode = data.priceMode || 'confirmed';
+    updatePriceModeUI();
     if(isEditingEstimateTable()) return; // 入力中は他端末の変更で巻き戻さない
     estimateItems = (data.items || []).map(it=>({ ...it }));
     renderEstimate();
@@ -786,6 +797,35 @@ function openCase(caseId, isNew){
     console.error('case snapshot error', err);
     toast('案件データの読み込みに失敗しました');
   });
+}
+
+/* ========================= 単価モード（v2で新規追加） ========================= */
+function updatePriceModeUI(){
+  document.querySelectorAll('#priceModeRow .mode-chip').forEach(chip=>{
+    chip.classList.toggle('active', chip.dataset.mode===currentCasePriceMode);
+  });
+  const btn = document.getElementById('autoPriceBtn');
+  if(currentCasePriceMode==='deferred'){
+    btn.style.display = 'none';
+  } else {
+    btn.style.display = '';
+    btn.textContent = currentCasePriceMode==='ai_provisional'
+      ? '単価を一括で引き当てる（AI概算のみ）'
+      : '単価を一括で引き当てる（単価表→AI概算）';
+  }
+}
+async function setPriceMode(mode){
+  currentCasePriceMode = mode;
+  updatePriceModeUI();
+  if(activeCaseId && db){
+    try{
+      await db.collection('mitsumori_cases').doc(activeCaseId).update({
+        priceMode: mode, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){
+      console.error('priceMode update error', e);
+    }
+  }
 }
 
 function scheduleCaseSave(){
@@ -1371,65 +1411,105 @@ function pickerGoBack(){
 document.getElementById('pickerBackBtn').addEventListener('click', pickerGoBack);
 document.getElementById('pickerCloseBtn').addEventListener('click', closePickerModal);
 
-/* 単価の一括引き当て：Firestore単価表 → 見つからなければAI概算 */
+/* ========================= 単価の一括引き当て（v2: モード別・上書きガード付き） =========================
+   手入力(manual)・メーカー単価表から選択済み(catalog)の項目は、意図的に決めた単価なので
+   再引き当ての対象から除外する（旧バージョンは無条件に全項目を上書きしていたバグを修正）。
+========================================================= */
+function eligibleForAutoPrice(it){
+  return it.priceSource !== 'manual' && it.priceSource !== 'catalog';
+}
+
+async function priceModeConfirmed(items){
+  const master = await loadMasterList();
+  const catalog = await loadCatalogItems();
+  const needsAI = [];
+  items.forEach(it=>{
+    const masterHit = master.find(m => it.name.includes(m.name) || m.name.includes(it.name));
+    if(masterHit){
+      it.unitPrice = masterHit.price;
+      it.costPrice = masterHit.costPrice || 0;
+      it.priceSource = 'master';
+      return;
+    }
+    const catalogHit = catalog.find(c => it.name.includes(c.itemName) || c.itemName.includes(it.name));
+    if(catalogHit){
+      it.unitPrice = catalogHit.unitPrice;
+      it.costPrice = catalogHit.costPrice || 0;
+      it.priceSource = 'catalog';
+      return;
+    }
+    needsAI.push(it);
+  });
+  renderEstimate();
+  if(needsAI.length > 0) await aiEstimatePrices(needsAI, false);
+}
+
+async function priceModeAiProvisional(items){
+  await aiEstimatePrices(items, true);
+}
+
+async function aiEstimatePrices(items, includeCost){
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      prices: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: Object.assign({
+            name: { type: "STRING" },
+            unitPrice: { type: "NUMBER", description: "円/単位の概算単価（税抜）" }
+          }, includeCost ? { estimatedCostPrice: { type: "NUMBER", description: "円/単位の概算原価（税抜、参考値）" } } : {}),
+          required: includeCost ? ["name","unitPrice","estimatedCostPrice"] : ["name","unitPrice"]
+        }
+      }
+    },
+    required: ["prices"]
+  };
+  const prompt = `以下は日本の建設・大工工事の見積項目です。一般的な相場感（税抜・円）で単価を概算してください。単価表に無い項目のみです。JSONのみ出力してください。\n\n` +
+    items.map(it=>`- ${it.name}（${it.spec||'仕様指定なし'}、単位:${it.unit}）`).join('\n');
+
+  const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
+  const parsed = safeParseJSON(raw);
+  if(parsed && Array.isArray(parsed.prices)){
+    parsed.prices.forEach(p=>{
+      const it = items.find(x=>x.name===p.name) || items.find(x=>x.name.includes(p.name)||p.name.includes(x.name));
+      if(it){
+        it.unitPrice = Number(p.unitPrice)||0;
+        if(includeCost) it.costPrice = Number(p.estimatedCostPrice)||0;
+        it.priceSource = 'ai';
+      }
+    });
+  }
+  renderEstimate();
+}
+
 document.getElementById('autoPriceBtn').addEventListener('click', async ()=>{
   if(estimateItems.length===0){ toast('明細がありません'); return; }
+  if(currentCasePriceMode==='deferred'){ toast('「PC後決め」モードのため単価は空欄のまま送ります'); return; }
   const btn = document.getElementById('autoPriceBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="loading"></span> 単価を引き当て中…';
 
   try{
-    const master = await loadMasterList();
-    const needsAI = [];
-    estimateItems.forEach(it=>{
-      const hit = master.find(m => it.name.includes(m.name) || m.name.includes(it.name));
-      if(hit){
-        it.unitPrice = hit.price;
-        it.priceSource = 'master';
-      } else {
-        needsAI.push(it);
-      }
-    });
-    renderEstimate();
-
-    if(needsAI.length > 0){
-      const schema = {
-        type: "OBJECT",
-        properties: {
-          prices: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                name: { type: "STRING" },
-                unitPrice: { type: "NUMBER", description: "円/単位の概算単価（税抜）" }
-              },
-              required: ["name","unitPrice"]
-            }
-          }
-        },
-        required: ["prices"]
-      };
-      const prompt = `以下は日本の建設・大工工事の見積項目です。一般的な相場感（税抜・円）で単価を概算してください。単価表に無い項目のみです。JSONのみ出力してください。\n\n` +
-        needsAI.map(it=>`- ${it.name}（${it.spec||'仕様指定なし'}、単位:${it.unit}）`).join('\n');
-
-      const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
-      const parsed = safeParseJSON(raw);
-      if(parsed && Array.isArray(parsed.prices)){
-        parsed.prices.forEach(p=>{
-          const it = needsAI.find(x=>x.name===p.name) || needsAI.find(x=>x.name.includes(p.name)||p.name.includes(x.name));
-          if(it){ it.unitPrice = Number(p.unitPrice)||0; it.priceSource = 'ai'; }
-        });
-      }
-      renderEstimate();
+    const targets = estimateItems.filter(eligibleForAutoPrice);
+    if(targets.length===0){
+      toast('すべて手入力・メーカー単価表指定済みです');
+      return;
     }
+    if(currentCasePriceMode==='ai_provisional'){
+      await priceModeAiProvisional(targets);
+    } else {
+      await priceModeConfirmed(targets);
+    }
+    scheduleCaseSave();
     toast('単価の引き当てが完了しました');
   }catch(err){
     console.error(err);
     toast('単価引き当てでエラーが発生しました');
   }finally{
     btn.disabled = false;
-    btn.textContent = '単価を一括で引き当てる（単価表→AI概算）';
+    updatePriceModeUI();
   }
 });
 
