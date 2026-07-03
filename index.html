@@ -637,7 +637,16 @@ if(auth){
   auth.onAuthStateChanged(async (user)=>{
     if(user){
       currentUser = user;
-      const profile = await loadMyUserDoc(user.uid, user);
+      // Firestore側の読み書きで何らかのエラー（ルール未反映・一時的な通信障害など）が
+      // 起きても、認証自体は成功しているのでアプリ画面には進める（ログイン画面に
+      // 固まったまま戻れなくなる事態を防ぐ）
+      let profile = { isAdmin:false };
+      try{
+        profile = await loadMyUserDoc(user.uid, user);
+      }catch(e){
+        console.error('loadMyUserDoc error', e);
+        toast('ユーザー情報の読み込みに失敗しました（管理者にご連絡ください）');
+      }
       currentUserIsAdmin = !!profile.isAdmin;
       document.getElementById('adminBtn').style.display = currentUserIsAdmin ? '' : 'none';
       document.getElementById('authScreen').style.display = 'none';
