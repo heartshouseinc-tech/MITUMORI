@@ -603,10 +603,20 @@ async function doRegister(){
   if(pass.length<6){ err.textContent = 'パスワードは6文字以上にしてください'; return; }
   if(!auth){ err.textContent = 'Firebase未設定です'; return; }
   try{
-    const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    await db.collection('mitsumori_users').doc(cred.user.uid).set({
+    // 別インスタンスで登録・プロフィール作成を行うことで、既にログイン中のユーザー
+    // （他人を代理登録する管理者など）のセッションが乗っ取られないようにする
+    const secondaryApp = firebase.apps.find(a=>a.name==='Secondary') || firebase.initializeApp(firebaseConfig, 'Secondary');
+    const secondaryAuth = secondaryApp.auth();
+    const secondaryDb = secondaryApp.firestore();
+    const cred = await secondaryAuth.createUserWithEmailAndPassword(email, pass);
+    await secondaryDb.collection('mitsumori_users').doc(cred.user.uid).set({
       name, email, isAdmin:false, hidden:false, createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    await secondaryAuth.signOut();
+    toast('「' + name + '」さんを登録しました。この仮パスワードを本人にお伝えください');
+    document.getElementById('reg-name').value = '';
+    document.getElementById('reg-email').value = '';
+    document.getElementById('reg-pass').value = '';
   }catch(e){
     err.textContent = authErrMsg(e.code);
   }
