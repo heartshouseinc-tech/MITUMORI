@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>見積AI帳場 | Hearts House Inc.</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2A41">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="見積AI帳場">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -629,7 +637,16 @@ if(auth){
   auth.onAuthStateChanged(async (user)=>{
     if(user){
       currentUser = user;
-      const profile = await loadMyUserDoc(user.uid, user);
+      // Firestore側の読み書きで何らかのエラー（ルール未反映・一時的な通信障害など）が
+      // 起きても、認証自体は成功しているのでアプリ画面には進める（ログイン画面に
+      // 固まったまま戻れなくなる事態を防ぐ）
+      let profile = { isAdmin:false };
+      try{
+        profile = await loadMyUserDoc(user.uid, user);
+      }catch(e){
+        console.error('loadMyUserDoc error', e);
+        toast('ユーザー情報の読み込みに失敗しました（管理者にご連絡ください）');
+      }
       currentUserIsAdmin = !!profile.isAdmin;
       document.getElementById('adminBtn').style.display = currentUserIsAdmin ? '' : 'none';
       document.getElementById('authScreen').style.display = 'none';
@@ -995,6 +1012,7 @@ function addToEstimate(items){
       spec: it.spec || '',
       qty: it.qty || 1,
       unit: it.unit || '式',
+      category: it.category || '',
       unitPrice: 0,
       priceSource: null
     });
@@ -1538,6 +1556,26 @@ document.getElementById('templateExcelInput').addEventListener('change', async (
 });
 
 /* ========================= 出力：Excel / PDF ========================= */
+/* 見積書の列見出し（工種・品名・仕様/数量/単位/単価/金額 等）を見出し文言から判別し、
+   任意の列構成のテンプレートでも列がズレずに出力できるようにする */
+function buildExcelRow(it, columns){
+  const amount = it.qty*it.unitPrice;
+  const hasQtyCol = columns.some(c=>c.includes('数量'));
+  const hasUnitCol = columns.some(c=>c.includes('単位'));
+  const nameText = (!hasQtyCol || !hasUnitCol)
+    ? `${it.name}${it.spec ? '（'+it.spec+'）' : ''} ${it.qty}${it.unit}`
+    : `${it.name}${it.spec ? ' '+it.spec : ''}`;
+  let nameUsed = false;
+  return columns.map(col=>{
+    if(col.includes('数量')) return it.qty;
+    if(col.includes('単位')) return it.unit;
+    if(col.includes('単価')) return it.unitPrice;
+    if(col.includes('金額')) return amount;
+    if(col.includes('工種')) return it.category || '';
+    if(!nameUsed){ nameUsed = true; return nameText; }
+    return '';
+  });
+}
 document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
   if(estimateItems.length===0){ toast('明細がありません'); return; }
   const t = templates.find(x=>x.id===selectedTemplateId) || templates[0];
@@ -1556,19 +1594,20 @@ document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
   aoa.push([]);
   aoa.push(t.columns);
   estimateItems.forEach(it=>{
-    if(t.columns.length===2){
-      aoa.push([`${it.name}（${it.spec||''} ${it.qty}${it.unit}）`, it.qty*it.unitPrice]);
-    } else if(t.columns.length===6){
-      aoa.push(['', `${it.name} ${it.spec||''}`, it.qty, it.unit, it.unitPrice, it.qty*it.unitPrice]);
-    } else {
-      aoa.push([`${it.name} ${it.spec||''}`, it.qty, it.unit, it.unitPrice, it.qty*it.unitPrice]);
-    }
+    aoa.push(buildExcelRow(it, t.columns));
   });
   aoa.push([]);
-  const lastColBlank = new Array(t.columns.length-1).fill('');
-  aoa.push(['小計', ...lastColBlank.slice(0,-1), subtotal]);
-  aoa.push(['消費税(10%)', ...lastColBlank.slice(0,-1), tax]);
-  aoa.push(['合計', ...lastColBlank.slice(0,-1), subtotal+tax]);
+  const amountColIdx = t.columns.findIndex(c=>c.includes('金額'));
+  const totalsColIdx = amountColIdx>=0 ? amountColIdx : t.columns.length-1;
+  const totalsRow = (label, val)=>{
+    const row = new Array(t.columns.length).fill('');
+    row[0] = label;
+    row[totalsColIdx] = val;
+    return row;
+  };
+  aoa.push(totalsRow('小計', subtotal));
+  aoa.push(totalsRow('消費税(10%)', tax));
+  aoa.push(totalsRow('合計', subtotal+tax));
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = t.columns.map(()=>({ wch: 18 }));
@@ -1600,6 +1639,13 @@ async function saveEstimateHistory(project, client, total){
 
 /* 初期化は認証状態確定後（onAuthStateChanged / Firebase未設定時のフォールバック）に
    bootAppAfterAuth() から呼び出される */
+
+/* ========================= PWA: Service Worker登録 ========================= */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.error('SW registration failed', err));
+  });
+}
 </script>
 </body>
 </html>
