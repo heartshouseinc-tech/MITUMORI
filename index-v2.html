@@ -462,6 +462,9 @@
         <button class="btn btn-primary" id="exportExcelBtn">📊 Excel出力</button>
         <button class="btn btn-outline" id="exportPdfBtn">🖨 PDF出力（印刷）</button>
       </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-full" id="claudeInstructionBtn">📋 Claude貼付用の指示文をコピー（PC仕上げ方式B）</button>
+      </div>
     </div>
   </section>
 
@@ -552,6 +555,20 @@
       <button class="btn btn-ghost" id="pickerCloseBtn">✕</button>
     </div>
     <div id="pickerModalBody"></div>
+  </div>
+</div>
+
+<div class="picker-modal" id="claudeInstructionModal" style="display:none;">
+  <div class="picker-modal-inner">
+    <div class="picker-modal-head">
+      <span>📋 Claude貼付用の指示文</span>
+      <button class="btn btn-ghost" id="claudeInstructionCloseBtn">✕</button>
+    </div>
+    <div style="padding:12px 14px;">
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 8px;">下のテキストをコピーし、Excel側のClaudeサイドバーに貼り付けてください。転記先のセル位置は05書式管理で編集できます（未設定の場合はA1から）。</p>
+      <textarea id="claudeInstructionText" readonly style="width:100%; min-height:220px; font-family:'JetBrains Mono',monospace; font-size:12px;"></textarea>
+      <button class="btn btn-primary btn-full" id="claudeInstructionCopyBtn" style="margin-top:10px;">コピーする</button>
+    </div>
   </div>
 </div>
 
@@ -1732,19 +1749,22 @@ const DEFAULT_TEMPLATES = [
     name: '標準見積書',
     desc: '品名・数量・単位・単価・金額の一般的な様式',
     headerTitle: '御 見 積 書',
-    columns: ['品名・仕様','数量','単位','単価','金額']
+    columns: ['品名・仕様','数量','単位','単価','金額'],
+    startCell: ''
   },
   {
     name: '詳細内訳付き見積書',
     desc: '工種カテゴリ別の内訳欄つき。大型改修向け',
     headerTitle: '御 見 積 書（内訳付）',
-    columns: ['工種','品名・仕様','数量','単位','単価','金額']
+    columns: ['工種','品名・仕様','数量','単位','単価','金額'],
+    startCell: ''
   },
   {
     name: '簡易見積書',
     desc: '式一括表記。小工事・急ぎの提示に',
     headerTitle: 'お見積り',
-    columns: ['内容','金額']
+    columns: ['内容','金額'],
+    startCell: ''
   }
 ];
 let templates = DEFAULT_TEMPLATES.map((t,i)=>({ id:'local'+i, ...t }));
@@ -1797,7 +1817,9 @@ async function editTemplate(id){
   if(newTitle!==null) t.headerTitle = newTitle;
   const newCols = prompt('列構成をカンマ区切りで入力', t.columns.join(','));
   if(newCols!==null) t.columns = newCols.split(',').map(s=>s.trim()).filter(Boolean);
-  if(db) await db.collection('mitsumori_templates').doc(t.id).update({ headerTitle:t.headerTitle, columns:t.columns });
+  const newStartCell = prompt('【PC仕上げ方式B用】実際のExcelで品目1行目が入るセル（例: B5）。使わない場合は空欄のまま', t.startCell||'');
+  if(newStartCell!==null) t.startCell = newStartCell.trim();
+  if(db) await db.collection('mitsumori_templates').doc(t.id).update({ headerTitle:t.headerTitle, columns:t.columns, startCell:t.startCell||'' });
   renderTemplateList();
 }
 async function deleteTemplate(id){
@@ -1810,7 +1832,7 @@ async function deleteTemplate(id){
 document.getElementById('addTemplateBtn').addEventListener('click', async ()=>{
   const name = prompt('新しい書式の名前');
   if(!name) return;
-  const t = { name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'] };
+  const t = { name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'], startCell:'' };
   let id = uid();
   if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
   templates.push({ id, ...t });
@@ -1842,7 +1864,7 @@ document.getElementById('templateExcelInput').addEventListener('change', async (
     if(!columns) columns = ['品名・仕様','数量','単位','単価','金額'];
 
     const name = file.name.replace(/\.[^.]+$/,'');
-    const t = { name, desc:'アップロードされた書式', headerTitle, columns };
+    const t = { name, desc:'アップロードされた書式', headerTitle, columns, startCell:'' };
     let id = uid();
     if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
     templates.push({ id, ...t });
@@ -1918,6 +1940,80 @@ document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
   toast('Excelを出力しました');
 
   saveEstimateHistory(project, client, subtotal+tax);
+  markCaseSentIfActive();
+});
+
+/* Excel出力（方式A）が完了したら、紐づく案件があれば送付済みにする */
+function markCaseSentIfActive(){
+  if(!activeCaseId || !db) return;
+  db.collection('mitsumori_cases').doc(activeCaseId).update({
+    status:'sent',
+    sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e=>console.error('markCaseSentIfActive error', e));
+}
+
+/* ========================= PC仕上げ 方式B：Claude in Excel 転記用の指示文生成 =========================
+   複雑な既存フォーマットの体裁を崩さず転記できるよう、列文字（A,B,C...）とセル位置を
+   決定的な文字列組み立てだけで求める（AIには一切通さない。セル座標の正確性が命の機能に
+   幻覚リスクを持ち込まないため）。buildExcelRow()をそのまま再利用し、値の並びだけ流用する。
+========================================================= */
+function columnIndexToLetter(idx){ // 0始まりの列番号 → "A","B",...,"AA"...
+  let s = '';
+  idx += 1;
+  while(idx > 0){
+    const rem = (idx - 1) % 26;
+    s = String.fromCharCode(65+rem) + s;
+    idx = Math.floor((idx-1)/26);
+  }
+  return s;
+}
+function letterToColumnIndex(letters){ // "A"→0, "B"→1 ...
+  let idx = 0;
+  for(let i=0; i<letters.length; i++){
+    idx = idx*26 + (letters.charCodeAt(i)-64);
+  }
+  return idx-1;
+}
+function parseStartCell(startCell){
+  const m = /^([A-Za-z]+)\s*(\d+)$/.exec((startCell||'').trim());
+  if(!m) return { colIdx:0, row:1 }; // 未設定ならA1起点とみなす
+  return { colIdx: letterToColumnIndex(m[1].toUpperCase()), row: Number(m[2]) };
+}
+
+function buildClaudeInstruction(items, t){
+  if(items.length===0) return '（明細がありません）';
+  const { colIdx, row } = parseStartCell(t.startCell);
+  const colLetters = t.columns.map((c,i)=>columnIndexToLetter(colIdx+i));
+  const mapping = t.columns.map((c,i)=>`${colLetters[i]}=${c}`).join(', ');
+  const lines = items.map(it=>buildExcelRow(it, t.columns).join(', '));
+  return [
+    `以下の項目を${colLetters[0]}${row}行目以降に、1項目1行で転記してください。`,
+    `列: ${mapping}（金額は数量×単価で計算）`,
+    ...lines.map((l,i)=>`${i+1}行目: ${l}`)
+  ].join('\n');
+}
+
+document.getElementById('claudeInstructionBtn').addEventListener('click', ()=>{
+  if(estimateItems.length===0){ toast('明細がありません'); return; }
+  const t = templates.find(x=>x.id===selectedTemplateId) || templates[0];
+  const text = buildClaudeInstruction(estimateItems, t);
+  document.getElementById('claudeInstructionText').value = text;
+  document.getElementById('claudeInstructionModal').style.display = 'flex';
+});
+document.getElementById('claudeInstructionCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('claudeInstructionModal').style.display = 'none';
+});
+document.getElementById('claudeInstructionCopyBtn').addEventListener('click', async ()=>{
+  const ta = document.getElementById('claudeInstructionText');
+  ta.select();
+  try{
+    await navigator.clipboard.writeText(ta.value);
+    toast('コピーしました');
+  }catch(e){
+    // クリップボード権限が無い環境向けのフォールバック：選択状態のまま手動コピーしてもらう
+    toast('自動コピーできませんでした。選択された文章を手動でコピーしてください');
+  }
 });
 
 document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
