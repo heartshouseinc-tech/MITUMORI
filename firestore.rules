@@ -16,6 +16,12 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.isAdmin == true;
     }
+    function isMitsumoriActive() {
+      return isAuth() && (
+        !exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.hidden != true
+      );
+    }
 
     match /users/{uid} {
       allow read: if isAuth();
@@ -233,16 +239,16 @@ service cloud.firestore {
       allow delete: if isMitsumoriAdmin();
     }
     match /mitsumori_price_master/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if isMitsumoriActive();
     }
     match /mitsumori_catalog_items/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if isMitsumoriActive();
     }
     match /mitsumori_templates/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if isMitsumoriActive();
     }
     match /mitsumori_history/{docId} {
-      allow read, create: if isAuth();
+      allow read, create: if isMitsumoriActive();
     }
 
     match /{document=**} {

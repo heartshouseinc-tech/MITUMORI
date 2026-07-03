@@ -481,8 +481,8 @@
     </div>
     <div style="padding:0 14px;">
       <div class="input-mode-row" style="margin-top:12px;">
-        <div class="mode-chip active" id="uatab-active" onclick="switchAdminTab('active')">表示中</div>
-        <div class="mode-chip" id="uatab-hidden" onclick="switchAdminTab('hidden')">非表示</div>
+        <div class="mode-chip active" id="uatab-active" onclick="switchAdminTab('active')">有効</div>
+        <div class="mode-chip" id="uatab-hidden" onclick="switchAdminTab('hidden')">無効化済み</div>
       </div>
       <button class="btn btn-outline btn-full" id="addUserConsoleBtn" style="margin-top:10px;">＋ Firebase Consoleでユーザーを追加</button>
       <p style="font-size:11px; color:var(--ink-soft); margin:6px 0 0;">Authenticationタブの「Add user」でメールアドレスと仮パスワードを発行してください。本人が一度ログインすると、この一覧に自動で表示されます。</p>
@@ -604,6 +604,12 @@ if(auth){
         console.error('loadMyUserDoc error', e);
         toast('ユーザー情報の読み込みに失敗しました（管理者にご連絡ください）');
       }
+      if(profile.hidden){
+        // 管理者が「非表示」にしたアカウントはここでログインを打ち切る
+        document.getElementById('li-err').textContent = 'このアカウントは無効化されています。管理者にお問い合わせください';
+        await auth.signOut();
+        return;
+      }
       currentUserIsAdmin = !!profile.isAdmin;
       document.getElementById('adminBtn').style.display = currentUserIsAdmin ? '' : 'none';
       document.getElementById('authScreen').style.display = 'none';
@@ -654,19 +660,19 @@ async function renderAdminUserList(){
   const all = snap.docs.map(d=>({ id:d.id, ...d.data() }));
   const list = all.filter(u => _adminTab==='hidden' ? u.hidden : !u.hidden);
   if(list.length===0){
-    wrap.innerHTML = `<div class="empty-state">${_adminTab==='hidden' ? '非表示のユーザーはいません' : 'ユーザーがいません'}</div>`;
+    wrap.innerHTML = `<div class="empty-state">${_adminTab==='hidden' ? '無効化されたユーザーはいません' : 'ユーザーがいません'}</div>`;
     return;
   }
   wrap.innerHTML = list.map(u=>`
     <div class="uitem">
       <div>
-        <div class="un">${escapeHtml(u.name||u.email)}${u.isAdmin?'<span class="badge-admin">管理者</span>':''}${u.hidden?'<span class="badge-hidden">非表示</span>':''}</div>
+        <div class="un">${escapeHtml(u.name||u.email)}${u.isAdmin?'<span class="badge-admin">管理者</span>':''}${u.hidden?'<span class="badge-hidden">無効化済み</span>':''}</div>
         <div class="ue">${escapeHtml(u.email||'')}</div>
       </div>
       <div style="display:flex; gap:6px;">
         ${u.id===currentUser.uid ? '<span style="font-size:11px;color:var(--ink-soft);">（自分）</span>' : `
           <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="isAdmin" data-val="${!u.isAdmin}" onclick="toggleUserField(this)">${u.isAdmin?'管理者を外す':'管理者にする'}</button>
-          <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="hidden" data-val="${!u.hidden}" onclick="toggleUserField(this)">${u.hidden?'表示に戻す':'非表示'}</button>
+          <button class="btn btn-ghost" style="padding:5px 8px; font-size:11px;" data-uid="${u.id}" data-field="hidden" data-val="${!u.hidden}" onclick="toggleUserField(this)">${u.hidden?'ログインを許可する':'ログインを無効化する'}</button>
         `}
       </div>
     </div>`).join('');
