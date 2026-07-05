@@ -194,12 +194,45 @@
   .template-card .t-name{font-weight:800; font-size:14px;}
   .template-card .t-desc{font-size:12px; color:var(--ink-soft); margin-top:3px;}
 
+  .kanban-board{
+    display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin-top:14px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .kanban-col{
+    flex:0 0 240px; background:var(--card); border:1px solid var(--paper-line); border-radius:2px;
+    display:flex; flex-direction:column; max-height:calc(100vh - 180px);
+  }
+  .kanban-col-head{
+    padding:10px 12px; border-bottom:2px solid var(--ink); font-family:'JetBrains Mono',monospace;
+    font-size:11px; letter-spacing:.05em; color:var(--ink-soft); display:flex; justify-content:space-between; align-items:center;
+    flex-shrink:0;
+  }
+  .kanban-col-body{padding:8px; overflow-y:auto; flex:1;}
+  .case-tile{
+    border:1.5px solid #D8D2C4; padding:10px; margin-bottom:8px; border-radius:2px; background:#FCFBF7; cursor:pointer;
+  }
+  .case-tile .c-name{font-weight:800; font-size:13.5px;}
+  .case-tile .c-client{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .case-tile .c-total{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--amber-deep); margin-top:6px; font-size:14px;}
+  .case-tile .c-meta{font-size:10px; color:var(--ink-soft); margin-top:4px;}
+  .case-tile .c-actions{display:flex; gap:5px; flex-wrap:wrap; margin-top:8px;}
+  .case-tile .c-actions button{
+    background:#EFEAE0; border:none; border-radius:2px; padding:4px 7px; font-size:10.5px; cursor:pointer; color:var(--ink);
+  }
+  .mode-badge{font-size:9.5px; padding:1px 5px; border-radius:2px; margin-left:4px; font-weight:700;}
+  .mode-badge.confirmed{background:#E3EEE3; color:var(--green);}
+  .mode-badge.deferred{background:#E5E9F0; color:var(--blue);}
+  .mode-badge.ai_provisional{background:#F3E6D8; color:var(--amber-deep);}
+  .margin-badge{font-size:9.5px; padding:1px 5px; border-radius:2px; margin-left:4px; font-weight:700;}
+  .margin-badge.ok{background:#E3EEE3; color:var(--green);}
+  .margin-badge.warn{background:#FCEFE8; color:var(--red);}
+
   .empty-state{
     text-align:center; padding:30px 10px; color:var(--ink-soft); font-size:13px;
   }
   .empty-state .mark{font-family:'Shippori Mincho',serif; font-size:28px; color:var(--blue); display:block; margin-bottom:6px;}
 
-  .master-row{display:grid; grid-template-columns:1fr 70px 60px 44px; gap:6px; align-items:center; padding:7px 0; border-bottom:1px solid var(--paper-line); font-size:13px;}
+  .master-row{display:grid; grid-template-columns:1fr 70px 70px 60px 44px; gap:6px; align-items:center; padding:7px 0; border-bottom:1px solid var(--paper-line); font-size:13px;}
   .master-row.head{font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--ink-soft); border-bottom:2px solid var(--ink);}
   .master-row .del{background:none; border:none; color:var(--red); cursor:pointer; font-size:16px;}
 
@@ -272,7 +305,7 @@
   .picker-item-row .price{font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--blue-deep);}
 
   @media print{
-    header.top, .steps, .btn-row, .no-print{display:none !important;}
+    header.top, .steps, .btn-row, .no-print, .no-print-view{display:none !important;}
     body{background:#fff; padding:0;}
     .panel{display:block !important;}
     #panel-output{display:block !important;}
@@ -302,13 +335,26 @@
 <header class="top">
   <div class="eyebrow">HEARTS HOUSE INC. / 現場帳場</div>
   <h1>見積AI帳場</h1>
-  <p>依頼を解析し、単価をあて、見積書に仕立てる</p>
+  <p id="headerTagline">案件を管理し、単価をあて、見積書に仕立てる</p>
   <div class="no-print" style="position:absolute; top:16px; right:16px; display:flex; gap:6px;">
+    <button class="btn btn-ghost" id="backToCasesBtn" style="display:none; padding:7px 10px; font-size:12px;" onclick="showCasesView()">← 案件一覧</button>
     <button class="btn btn-ghost" id="adminBtn" style="display:none; padding:7px 10px; font-size:12px;" onclick="openAdminModal()">⚙️ 管理</button>
-    <button class="btn btn-ghost" style="padding:7px 10px; font-size:12px;" onclick="doLogout()">ログアウト</button>
+    <button class="btn btn-ghost" id="logoutBtn" style="padding:7px 10px; font-size:12px;" onclick="doLogout()">ログアウト</button>
   </div>
 </header>
 
+<!-- 案件一覧（カンバン） -->
+<div id="casesView" class="no-print-view">
+  <div style="padding:16px;">
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-primary btn-full" id="newCaseBtn">＋ 新規案件を作成</button>
+    </div>
+    <div class="kanban-board" id="kanbanBoard"></div>
+  </div>
+</div>
+
+<!-- 案件ウィザード（依頼入力〜メーカー単価表） -->
+<div id="wizardView" style="display:none;">
 <nav class="steps no-print" id="steps">
   <button class="step-btn active" data-panel="input"><span class="num">01</span><span class="label">依頼入力</span></button>
   <button class="step-btn" data-panel="select"><span class="num">02</span><span class="label">項目選定</span></button>
@@ -385,6 +431,12 @@
   <section class="panel" id="panel-output">
     <div class="card">
       <h2><span class="tag">03</span>見積明細</h2>
+      <label class="field-label">単価モード（この案件の方針）</label>
+      <div class="input-mode-row" id="priceModeRow">
+        <div class="mode-chip" data-mode="confirmed" onclick="setPriceMode('confirmed')">現場確定</div>
+        <div class="mode-chip" data-mode="deferred" onclick="setPriceMode('deferred')">PC後決め</div>
+        <div class="mode-chip" data-mode="ai_provisional" onclick="setPriceMode('ai_provisional')">AI仮単価</div>
+      </div>
       <div id="estimateTableWrap">
         <div class="empty-state"><span class="mark">明細なし</span>ステップ02で項目を選んでください</div>
       </div>
@@ -395,6 +447,9 @@
         <div class="row"><span>小計</span><span class="mono" id="subtotalVal">¥0</span></div>
         <div class="row"><span>消費税（10%）</span><span class="mono" id="taxVal">¥0</span></div>
         <div class="row grand"><span>合計</span><span class="mono" id="grandVal">¥0</span></div>
+        <div class="row" style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--paper-line);"><span>原価小計</span><span class="mono" id="costSubtotalVal">¥0</span></div>
+        <div class="row"><span>粗利</span><span class="mono" id="grossProfitVal">¥0</span></div>
+        <div class="row"><span>粗利率</span><span class="mono" id="marginRateVal">-</span></div>
       </div>
     </div>
 
@@ -403,12 +458,15 @@
       <label class="field-label">使用する書式（ステップ05で登録・編集可）</label>
       <div id="templatePickerMini"></div>
       <label class="field-label">案件名</label>
-      <input type="text" id="projectName" placeholder="例）〇〇邸 改修工事">
+      <input type="text" id="projectName" placeholder="例）〇〇邸 改修工事" onchange="scheduleCaseSave()">
       <label class="field-label">宛先</label>
-      <input type="text" id="clientName" placeholder="例）〇〇様">
+      <input type="text" id="clientName" placeholder="例）〇〇様" onchange="scheduleCaseSave()">
       <div class="btn-row">
         <button class="btn btn-primary" id="exportExcelBtn">📊 Excel出力</button>
         <button class="btn btn-outline" id="exportPdfBtn">🖨 PDF出力（印刷）</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-full" id="claudeInstructionBtn">📋 Claude貼付用の指示文をコピー（PC仕上げ方式B）</button>
       </div>
     </div>
   </section>
@@ -417,9 +475,9 @@
   <section class="panel" id="panel-master">
     <div class="card">
       <h2><span class="tag">04</span>単価マスタ（Firestore保存）</h2>
-      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">品目・単価を登録しておくと、AIが見積項目にマッチさせて自動で単価をあてます。</p>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">品目・単価を登録しておくと、AIが見積項目にマッチさせて自動で単価をあてます。原価を入れておくと粗利チェックに使われます（任意）。</p>
       <div class="master-row head">
-        <div>品目</div><div>単価</div><div>単位</div><div></div>
+        <div>品目</div><div>単価</div><div>原価</div><div>単位</div><div></div>
       </div>
       <div id="masterList"></div>
       <div class="btn-row">
@@ -428,7 +486,7 @@
     </div>
     <div class="card">
       <h2><span class="tag">読込</span>既存Excel単価表をインポート</h2>
-      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">品目名・単価・単位の3列がある表を想定しています（1行目は見出し扱い）。</p>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:-6px;">品目名・単価・単位の3列（4列目に原価があれば併せて取込）を想定しています（1行目は見出し扱い）。</p>
       <input type="file" id="masterExcelInput" accept=".xlsx,.xls,.csv">
       <div id="masterImportStatus" style="font-size:12px; color:var(--ink-soft); margin-top:6px;"></div>
     </div>
@@ -470,6 +528,7 @@
   </section>
 
 </main>
+</div><!-- /wizardView -->
 
 </div><!-- /appRoot -->
 
@@ -499,6 +558,20 @@
       <button class="btn btn-ghost" id="pickerCloseBtn">✕</button>
     </div>
     <div id="pickerModalBody"></div>
+  </div>
+</div>
+
+<div class="picker-modal" id="claudeInstructionModal" style="display:none;">
+  <div class="picker-modal-inner">
+    <div class="picker-modal-head">
+      <span>📋 Claude貼付用の指示文</span>
+      <button class="btn btn-ghost" id="claudeInstructionCloseBtn">✕</button>
+    </div>
+    <div style="padding:12px 14px;">
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 8px;">下のテキストをコピーし、Excel側のClaudeサイドバーに貼り付けてください。転記先のセル位置は05書式管理で編集できます（未設定の場合はA1から）。</p>
+      <textarea id="claudeInstructionText" readonly style="width:100%; min-height:220px; font-family:'JetBrains Mono',monospace; font-size:12px;"></textarea>
+      <button class="btn btn-primary btn-full" id="claudeInstructionCopyBtn" style="margin-top:10px;">コピーする</button>
+    </div>
   </div>
 </div>
 
@@ -587,8 +660,286 @@ function bootAppAfterAuth(){
     renderTemplateList();
     renderMasterList();
     renderMfrList();
+    showCasesView();
   })();
 }
+
+/* ========================= 案件（Cases）: v2で新規追加 =========================
+   スマホで作った案件をFirestoreに永続化し、PCで同じURLを開けば同じ案件が
+   リアルタイムに同期される（onSnapshotを使う、このアプリで初めての仕組み）。
+========================================================= */
+let activeCaseId = null;
+let _activeCaseUnsub = null;
+let _casesListUnsub = null;
+let _caseSaveTimer = null;
+let _allCases = [];
+let currentCasePriceMode = 'confirmed'; // 'confirmed' | 'deferred' | 'ai_provisional'
+
+function calcTotals(items){
+  const subtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const tax = Math.round(subtotal*0.1);
+  return { subtotal, tax, total: subtotal+tax };
+}
+
+/* ========================= 粗利チェック（v2で新規追加） =========================
+   しきい値は暫定値。業種・案件により適切な値に調整してください
+   （このアプリにはまだ粗利の実績データが無いため確定値ではありません）。
+========================================================= */
+const MARGIN_THRESHOLD_PERCENT = 20;
+
+function calcMargin(items){
+  const sellSubtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const costSubtotal = items.reduce((s,it)=>s + it.qty*(it.costPrice||0), 0);
+  const grossProfit = sellSubtotal - costSubtotal;
+  const marginRate = sellSubtotal > 0 ? (grossProfit/sellSubtotal*100) : null;
+  // 「原価が1件も入力されていない」場合は原価未設定として区別する
+  // （0円と未設定を同一視すると、粗利100%という誤った表示になるため）
+  const hasAnyCost = items.some(it => (it.costPrice||0) > 0);
+  return { sellSubtotal, costSubtotal, grossProfit, marginRate, hasAnyCost };
+}
+
+function showCasesView(){
+  unsubscribeActiveCase();
+  activeCaseId = null;
+  document.getElementById('casesView').style.display = 'block';
+  document.getElementById('wizardView').style.display = 'none';
+  document.getElementById('backToCasesBtn').style.display = 'none';
+  subscribeCasesList();
+}
+function showWizardView(){
+  document.getElementById('casesView').style.display = 'none';
+  document.getElementById('wizardView').style.display = 'block';
+  document.getElementById('backToCasesBtn').style.display = '';
+}
+
+function subscribeCasesList(){
+  if(!db || _casesListUnsub) return;
+  _casesListUnsub = db.collection('mitsumori_cases').onSnapshot(snap=>{
+    _allCases = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderKanban();
+  }, err=>{
+    console.error('cases list snapshot error', err);
+    toast('案件一覧の読み込みに失敗しました');
+  });
+  renderKanban(); // Firebase未設定時も空一覧を表示できるように即描画
+}
+function unsubscribeCasesList(){
+  if(_casesListUnsub){ _casesListUnsub(); _casesListUnsub = null; }
+}
+
+function renderKanban(){
+  const board = document.getElementById('kanbanBoard');
+  const cols = [
+    { key:'draft', label:'下書き' },
+    { key:'pc_pending', label:'PC仕上げ待ち' },
+    { key:'sent', label:'送付済み' },
+    { key:'closed', label:'受注・失注' }
+  ];
+  const byCol = { draft:[], pc_pending:[], sent:[], closed:[] };
+  _allCases.forEach(c=>{
+    const col = (c.status==='won'||c.status==='lost') ? 'closed' : (byCol[c.status] ? c.status : 'draft');
+    byCol[col].push(c);
+  });
+  Object.values(byCol).forEach(list=>list.sort((a,b)=>((b.updatedAt&&b.updatedAt.toMillis&&b.updatedAt.toMillis())||0)-((a.updatedAt&&a.updatedAt.toMillis&&a.updatedAt.toMillis())||0)));
+
+  board.innerHTML = cols.map(col=>`
+    <div class="kanban-col">
+      <div class="kanban-col-head"><span>${col.label}</span><span class="tag">${byCol[col.key].length}</span></div>
+      <div class="kanban-col-body">
+        ${byCol[col.key].length===0 ? '<div class="empty-state" style="padding:16px 6px;">案件なし</div>' : byCol[col.key].map(c=>renderCaseTile(c)).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderCaseTile(c){
+  const modeLabel = { confirmed:'現場確定', deferred:'PC後決め', ai_provisional:'AI仮単価' }[c.priceMode] || '';
+  const modeBadge = c.priceMode ? `<span class="mode-badge ${c.priceMode}">${modeLabel}</span>` : '';
+  const statusBadge = c.status==='won' ? '<span class="margin-badge ok">受注</span>' : c.status==='lost' ? '<span class="margin-badge warn">失注</span>' : '';
+  const margin = calcMargin(c.items || []);
+  const marginBadge = margin.hasAnyCost
+    ? `<span class="margin-badge ${margin.marginRate!==null && margin.marginRate < MARGIN_THRESHOLD_PERCENT ? 'warn' : 'ok'}">粗利${margin.marginRate===null?'-':margin.marginRate.toFixed(0)+'%'}</span>`
+    : '';
+  let actions = '';
+  if(c.status==='draft') actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','pc_pending')">PCへ送る</button>`;
+  if(c.status==='pc_pending') actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','sent')">送付済みにする</button>`;
+  if(c.status==='sent'){
+    actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','won')">受注</button>`;
+    actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','lost')">失注</button>`;
+  }
+  actions += `<button onclick="event.stopPropagation(); duplicateCase('${c.id}')">複製</button>`;
+  return `
+    <div class="case-tile" onclick="openCase('${c.id}', false)">
+      <div class="c-name">${escapeHtml(c.project||'（案件名未入力）')}${modeBadge}${statusBadge}</div>
+      <div class="c-client">${escapeHtml(c.client||'')}</div>
+      <div class="c-total">${yen(c.total||0)}${marginBadge}</div>
+      <div class="c-meta">更新: ${formatCaseTime(c.updatedAt)}</div>
+      <div class="c-actions">${actions}</div>
+    </div>`;
+}
+function formatCaseTime(ts){
+  if(!ts || !ts.toDate) return '-';
+  const d = ts.toDate();
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+async function updateCaseStatus(caseId, status){
+  if(!db) return;
+  const patch = { status, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  if(status==='sent') patch.sentAt = firebase.firestore.FieldValue.serverTimestamp();
+  if(status==='won'||status==='lost') patch.closedAt = firebase.firestore.FieldValue.serverTimestamp();
+  try{
+    await db.collection('mitsumori_cases').doc(caseId).update(patch);
+    toast('ステータスを更新しました');
+  }catch(e){
+    console.error(e);
+    toast('ステータス更新に失敗しました（他人の案件は管理者のみ操作できます）');
+  }
+}
+
+/* 過去案件の複製（v2で新規追加）。mitsumori_history（priceMode/costPrice/statusを
+   持たない旧形式）ではなく、mitsumori_casesを複製元とする */
+async function duplicateCase(caseId){
+  if(!db) return;
+  try{
+    const snap = await db.collection('mitsumori_cases').doc(caseId).get();
+    if(!snap.exists){ toast('複製元の案件が見つかりません'); return; }
+    const src = snap.data();
+    const newItems = (src.items || []).map(it=>({ ...it, id: uid() }));
+    const totals = calcTotals(newItems);
+    const ref = await db.collection('mitsumori_cases').add({
+      status: 'draft',
+      project: (src.project || '（案件名未入力）') + '（コピー）',
+      client: src.client || '',
+      priceMode: src.priceMode || 'confirmed',
+      items: newItems,
+      templateId: src.templateId || null,
+      subtotal: totals.subtotal, tax: totals.tax, total: totals.total,
+      ownerUid: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sentAt: null, closedAt: null
+    });
+    toast('案件を複製しました');
+    openCase(ref.id, false);
+  }catch(e){
+    console.error(e);
+    toast('複製に失敗しました');
+  }
+}
+
+function unsubscribeActiveCase(){
+  if(_activeCaseUnsub){ _activeCaseUnsub(); _activeCaseUnsub = null; }
+  if(_caseSaveTimer){ clearTimeout(_caseSaveTimer); _caseSaveTimer = null; }
+}
+
+function isEditingEstimateTable(){
+  const el = document.activeElement;
+  if(!el) return false;
+  const wrap = document.getElementById('estimateTableWrap');
+  return !!(wrap && wrap.contains(el)) || el.id==='projectName' || el.id==='clientName';
+}
+
+function openCase(caseId, isNew){
+  if(!db) return;
+  unsubscribeActiveCase();
+  unsubscribeCasesList();
+  activeCaseId = caseId;
+  candidateItems = [];
+  estimateItems = [];
+  currentCasePriceMode = 'confirmed';
+  updatePriceModeUI();
+  renderCandidates();
+  renderEstimate();
+  showWizardView();
+  goToPanel(isNew ? 'input' : 'output');
+
+  _activeCaseUnsub = db.collection('mitsumori_cases').doc(caseId).onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const data = snap.data();
+    currentCasePriceMode = data.priceMode || 'confirmed';
+    updatePriceModeUI();
+    if(isEditingEstimateTable()) return; // 入力中は他端末の変更で巻き戻さない
+    estimateItems = (data.items || []).map(it=>({ ...it }));
+    renderEstimate();
+    const projectEl = document.getElementById('projectName');
+    const clientEl = document.getElementById('clientName');
+    if(projectEl && document.activeElement!==projectEl) projectEl.value = data.project || '';
+    if(clientEl && document.activeElement!==clientEl) clientEl.value = data.client || '';
+    if(data.templateId){ selectedTemplateId = data.templateId; renderTemplatePickerMini(); }
+  }, err=>{
+    console.error('case snapshot error', err);
+    toast('案件データの読み込みに失敗しました');
+  });
+}
+
+/* ========================= 単価モード（v2で新規追加） ========================= */
+function updatePriceModeUI(){
+  document.querySelectorAll('#priceModeRow .mode-chip').forEach(chip=>{
+    chip.classList.toggle('active', chip.dataset.mode===currentCasePriceMode);
+  });
+  const btn = document.getElementById('autoPriceBtn');
+  if(currentCasePriceMode==='deferred'){
+    btn.style.display = 'none';
+  } else {
+    btn.style.display = '';
+    btn.textContent = currentCasePriceMode==='ai_provisional'
+      ? '単価を一括で引き当てる（AI概算のみ）'
+      : '単価を一括で引き当てる（単価表→AI概算）';
+  }
+}
+async function setPriceMode(mode){
+  currentCasePriceMode = mode;
+  updatePriceModeUI();
+  if(activeCaseId && db){
+    try{
+      await db.collection('mitsumori_cases').doc(activeCaseId).update({
+        priceMode: mode, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){
+      console.error('priceMode update error', e);
+    }
+  }
+}
+
+function scheduleCaseSave(){
+  if(!activeCaseId || !db) return;
+  if(_caseSaveTimer) clearTimeout(_caseSaveTimer);
+  _caseSaveTimer = setTimeout(async ()=>{
+    const { subtotal, tax, total } = calcTotals(estimateItems);
+    const projectEl = document.getElementById('projectName');
+    const clientEl = document.getElementById('clientName');
+    try{
+      await db.collection('mitsumori_cases').doc(activeCaseId).update({
+        items: estimateItems,
+        project: projectEl ? projectEl.value : '',
+        client: clientEl ? clientEl.value : '',
+        templateId: selectedTemplateId,
+        subtotal, tax, total,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){
+      console.error('case save error', e);
+    }
+  }, 500);
+}
+
+document.getElementById('newCaseBtn').addEventListener('click', async ()=>{
+  if(!db){ toast('Firebase未設定のため案件を作成できません'); return; }
+  try{
+    const ref = await db.collection('mitsumori_cases').add({
+      status:'draft', project:'', client:'', priceMode:'confirmed',
+      items:[], templateId:null, subtotal:0, tax:0, total:0,
+      ownerUid: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sentAt:null, closedAt:null
+    });
+    openCase(ref.id, true);
+  }catch(e){
+    console.error(e);
+    toast('案件の作成に失敗しました');
+  }
+});
 
 if(auth){
   auth.onAuthStateChanged(async (user)=>{
@@ -618,6 +969,8 @@ if(auth){
     } else {
       currentUser = null;
       currentUserIsAdmin = false;
+      unsubscribeActiveCase();
+      unsubscribeCasesList();
       document.getElementById('authScreen').style.display = 'flex';
       document.getElementById('appRoot').style.display = 'none';
     }
@@ -984,10 +1337,12 @@ function addToEstimate(items){
       unit: it.unit || '式',
       category: it.category || '',
       unitPrice: 0,
+      costPrice: 0,
       priceSource: null
     });
   });
   renderEstimate();
+  scheduleCaseSave();
 }
 
 function renderEstimate(){
@@ -1027,10 +1382,12 @@ function updateEstimate(id, field, val){
   it[field] = Number(val);
   if(field==='unitPrice') it.priceSource = 'manual';
   renderEstimate();
+  scheduleCaseSave();
 }
 function removeEstimate(id){
   estimateItems = estimateItems.filter(x=>x.id!==id);
   renderEstimate();
+  scheduleCaseSave();
 }
 function computeTotals(){
   const subtotal = estimateItems.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
@@ -1038,6 +1395,19 @@ function computeTotals(){
   document.getElementById('subtotalVal').textContent = yen(subtotal);
   document.getElementById('taxVal').textContent = yen(tax);
   document.getElementById('grandVal').textContent = yen(subtotal+tax);
+
+  const margin = calcMargin(estimateItems);
+  document.getElementById('costSubtotalVal').textContent = yen(margin.costSubtotal);
+  document.getElementById('grossProfitVal').textContent = yen(margin.grossProfit);
+  const rateEl = document.getElementById('marginRateVal');
+  if(!margin.hasAnyCost){
+    rateEl.textContent = '原価未設定';
+    rateEl.style.color = 'var(--ink-soft)';
+  } else {
+    const warn = margin.marginRate!==null && margin.marginRate < MARGIN_THRESHOLD_PERCENT;
+    rateEl.textContent = (margin.marginRate===null ? '-' : margin.marginRate.toFixed(1)+'%') + (warn ? ' ⚠️' : '');
+    rateEl.style.color = warn ? 'var(--red)' : 'var(--green)';
+  }
 }
 
 /* ========================= 単価表ピッカー（ジャンル→メーカー→品目） ========================= */
@@ -1127,65 +1497,105 @@ function pickerGoBack(){
 document.getElementById('pickerBackBtn').addEventListener('click', pickerGoBack);
 document.getElementById('pickerCloseBtn').addEventListener('click', closePickerModal);
 
-/* 単価の一括引き当て：Firestore単価表 → 見つからなければAI概算 */
+/* ========================= 単価の一括引き当て（v2: モード別・上書きガード付き） =========================
+   手入力(manual)・メーカー単価表から選択済み(catalog)の項目は、意図的に決めた単価なので
+   再引き当ての対象から除外する（旧バージョンは無条件に全項目を上書きしていたバグを修正）。
+========================================================= */
+function eligibleForAutoPrice(it){
+  return it.priceSource !== 'manual' && it.priceSource !== 'catalog';
+}
+
+async function priceModeConfirmed(items){
+  const master = await loadMasterList();
+  const catalog = await loadCatalogItems();
+  const needsAI = [];
+  items.forEach(it=>{
+    const masterHit = master.find(m => it.name.includes(m.name) || m.name.includes(it.name));
+    if(masterHit){
+      it.unitPrice = masterHit.price;
+      it.costPrice = masterHit.costPrice || 0;
+      it.priceSource = 'master';
+      return;
+    }
+    const catalogHit = catalog.find(c => it.name.includes(c.itemName) || c.itemName.includes(it.name));
+    if(catalogHit){
+      it.unitPrice = catalogHit.unitPrice;
+      it.costPrice = catalogHit.costPrice || 0;
+      it.priceSource = 'catalog';
+      return;
+    }
+    needsAI.push(it);
+  });
+  renderEstimate();
+  if(needsAI.length > 0) await aiEstimatePrices(needsAI, false);
+}
+
+async function priceModeAiProvisional(items){
+  await aiEstimatePrices(items, true);
+}
+
+async function aiEstimatePrices(items, includeCost){
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      prices: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: Object.assign({
+            name: { type: "STRING" },
+            unitPrice: { type: "NUMBER", description: "円/単位の概算単価（税抜）" }
+          }, includeCost ? { estimatedCostPrice: { type: "NUMBER", description: "円/単位の概算原価（税抜、参考値）" } } : {}),
+          required: includeCost ? ["name","unitPrice","estimatedCostPrice"] : ["name","unitPrice"]
+        }
+      }
+    },
+    required: ["prices"]
+  };
+  const prompt = `以下は日本の建設・大工工事の見積項目です。一般的な相場感（税抜・円）で単価を概算してください。単価表に無い項目のみです。JSONのみ出力してください。\n\n` +
+    items.map(it=>`- ${it.name}（${it.spec||'仕様指定なし'}、単位:${it.unit}）`).join('\n');
+
+  const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
+  const parsed = safeParseJSON(raw);
+  if(parsed && Array.isArray(parsed.prices)){
+    parsed.prices.forEach(p=>{
+      const it = items.find(x=>x.name===p.name) || items.find(x=>x.name.includes(p.name)||p.name.includes(x.name));
+      if(it){
+        it.unitPrice = Number(p.unitPrice)||0;
+        if(includeCost) it.costPrice = Number(p.estimatedCostPrice)||0;
+        it.priceSource = 'ai';
+      }
+    });
+  }
+  renderEstimate();
+}
+
 document.getElementById('autoPriceBtn').addEventListener('click', async ()=>{
   if(estimateItems.length===0){ toast('明細がありません'); return; }
+  if(currentCasePriceMode==='deferred'){ toast('「PC後決め」モードのため単価は空欄のまま送ります'); return; }
   const btn = document.getElementById('autoPriceBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="loading"></span> 単価を引き当て中…';
 
   try{
-    const master = await loadMasterList();
-    const needsAI = [];
-    estimateItems.forEach(it=>{
-      const hit = master.find(m => it.name.includes(m.name) || m.name.includes(it.name));
-      if(hit){
-        it.unitPrice = hit.price;
-        it.priceSource = 'master';
-      } else {
-        needsAI.push(it);
-      }
-    });
-    renderEstimate();
-
-    if(needsAI.length > 0){
-      const schema = {
-        type: "OBJECT",
-        properties: {
-          prices: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                name: { type: "STRING" },
-                unitPrice: { type: "NUMBER", description: "円/単位の概算単価（税抜）" }
-              },
-              required: ["name","unitPrice"]
-            }
-          }
-        },
-        required: ["prices"]
-      };
-      const prompt = `以下は日本の建設・大工工事の見積項目です。一般的な相場感（税抜・円）で単価を概算してください。単価表に無い項目のみです。JSONのみ出力してください。\n\n` +
-        needsAI.map(it=>`- ${it.name}（${it.spec||'仕様指定なし'}、単位:${it.unit}）`).join('\n');
-
-      const raw = await callAskAI({ prompt, mode:'normal', responseSchema: schema });
-      const parsed = safeParseJSON(raw);
-      if(parsed && Array.isArray(parsed.prices)){
-        parsed.prices.forEach(p=>{
-          const it = needsAI.find(x=>x.name===p.name) || needsAI.find(x=>x.name.includes(p.name)||p.name.includes(x.name));
-          if(it){ it.unitPrice = Number(p.unitPrice)||0; it.priceSource = 'ai'; }
-        });
-      }
-      renderEstimate();
+    const targets = estimateItems.filter(eligibleForAutoPrice);
+    if(targets.length===0){
+      toast('すべて手入力・メーカー単価表指定済みです');
+      return;
     }
+    if(currentCasePriceMode==='ai_provisional'){
+      await priceModeAiProvisional(targets);
+    } else {
+      await priceModeConfirmed(targets);
+    }
+    scheduleCaseSave();
     toast('単価の引き当てが完了しました');
   }catch(err){
     console.error(err);
     toast('単価引き当てでエラーが発生しました');
   }finally{
     btn.disabled = false;
-    btn.textContent = '単価を一括で引き当てる（単価表→AI概算）';
+    updatePriceModeUI();
   }
 });
 
@@ -1210,13 +1620,14 @@ async function renderMasterList(){
     <div class="master-row">
       <input type="text" value="${escapeHtml(m.name)}" onchange="updateMaster('${m.id}','name',this.value)">
       <input type="number" value="${m.price}" onchange="updateMaster('${m.id}','price',this.value)">
+      <input type="number" value="${m.costPrice||0}" onchange="updateMaster('${m.id}','costPrice',this.value)">
       <input type="text" value="${escapeHtml(m.unit||'')}" onchange="updateMaster('${m.id}','unit',this.value)">
       <button class="del" onclick="deleteMaster('${m.id}')">✕</button>
     </div>`).join('');
 }
 async function updateMaster(id, field, val){
   if(!db) return;
-  const v = (field==='price') ? Number(val) : val;
+  const v = (field==='price'||field==='costPrice') ? Number(val) : val;
   await db.collection('mitsumori_price_master').doc(id).update({ [field]: v });
 }
 async function deleteMaster(id){
@@ -1226,7 +1637,7 @@ async function deleteMaster(id){
 }
 document.getElementById('addMasterBtn').addEventListener('click', async ()=>{
   if(!db){ toast('Firebase未設定です'); return; }
-  await db.collection('mitsumori_price_master').add({ name:'新しい品目', price:0, unit:'式' });
+  await db.collection('mitsumori_price_master').add({ name:'新しい品目', price:0, costPrice:0, unit:'式' });
   renderMasterList();
 });
 
@@ -1252,7 +1663,8 @@ document.getElementById('masterExcelInput').addEventListener('change', async (e)
       batch.set(ref, {
         name: String(r[0]||'').trim(),
         price: Number(r[1])||0,
-        unit: String(r[2]||'式').trim()
+        unit: String(r[2]||'式').trim(),
+        costPrice: Number(r[3])||0
       });
     });
     await batch.commit();
@@ -1381,6 +1793,10 @@ ${chunk.map((it,idx)=>`${idx}: ${it.name}`).join('\n')}
         itemName: it.name,
         grade: it.grade,
         unitPrice: it.price,
+        // 原価フィールド（粗利チェック用）。取り込んだExcelのunitPriceが原価か売値かは
+        // メーカー・運用によって異なるため、v2では未設定のまま追加し、必要に応じて
+        // 単価表と同様に手入力で埋める運用とする（要確認事項としてplanに記載済み）。
+        costPrice: 0,
         unit: it.unit,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -1402,19 +1818,22 @@ const DEFAULT_TEMPLATES = [
     name: '標準見積書',
     desc: '品名・数量・単位・単価・金額の一般的な様式',
     headerTitle: '御 見 積 書',
-    columns: ['品名・仕様','数量','単位','単価','金額']
+    columns: ['品名・仕様','数量','単位','単価','金額'],
+    startCell: ''
   },
   {
     name: '詳細内訳付き見積書',
     desc: '工種カテゴリ別の内訳欄つき。大型改修向け',
     headerTitle: '御 見 積 書（内訳付）',
-    columns: ['工種','品名・仕様','数量','単位','単価','金額']
+    columns: ['工種','品名・仕様','数量','単位','単価','金額'],
+    startCell: ''
   },
   {
     name: '簡易見積書',
     desc: '式一括表記。小工事・急ぎの提示に',
     headerTitle: 'お見積り',
-    columns: ['内容','金額']
+    columns: ['内容','金額'],
+    startCell: ''
   }
 ];
 let templates = DEFAULT_TEMPLATES.map((t,i)=>({ id:'local'+i, ...t }));
@@ -1467,7 +1886,9 @@ async function editTemplate(id){
   if(newTitle!==null) t.headerTitle = newTitle;
   const newCols = prompt('列構成をカンマ区切りで入力', t.columns.join(','));
   if(newCols!==null) t.columns = newCols.split(',').map(s=>s.trim()).filter(Boolean);
-  if(db) await db.collection('mitsumori_templates').doc(t.id).update({ headerTitle:t.headerTitle, columns:t.columns });
+  const newStartCell = prompt('【PC仕上げ方式B用】実際のExcelで品目1行目が入るセル（例: B5）。使わない場合は空欄のまま', t.startCell||'');
+  if(newStartCell!==null) t.startCell = newStartCell.trim();
+  if(db) await db.collection('mitsumori_templates').doc(t.id).update({ headerTitle:t.headerTitle, columns:t.columns, startCell:t.startCell||'' });
   renderTemplateList();
 }
 async function deleteTemplate(id){
@@ -1480,7 +1901,7 @@ async function deleteTemplate(id){
 document.getElementById('addTemplateBtn').addEventListener('click', async ()=>{
   const name = prompt('新しい書式の名前');
   if(!name) return;
-  const t = { name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'] };
+  const t = { name, desc:'', headerTitle: name, columns:['品名・仕様','数量','単位','単価','金額'], startCell:'' };
   let id = uid();
   if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
   templates.push({ id, ...t });
@@ -1512,7 +1933,7 @@ document.getElementById('templateExcelInput').addEventListener('change', async (
     if(!columns) columns = ['品名・仕様','数量','単位','単価','金額'];
 
     const name = file.name.replace(/\.[^.]+$/,'');
-    const t = { name, desc:'アップロードされた書式', headerTitle, columns };
+    const t = { name, desc:'アップロードされた書式', headerTitle, columns, startCell:'' };
     let id = uid();
     if(db){ const ref = await db.collection('mitsumori_templates').add(t); id = ref.id; }
     templates.push({ id, ...t });
@@ -1588,6 +2009,80 @@ document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
   toast('Excelを出力しました');
 
   saveEstimateHistory(project, client, subtotal+tax);
+  markCaseSentIfActive();
+});
+
+/* Excel出力（方式A）が完了したら、紐づく案件があれば送付済みにする */
+function markCaseSentIfActive(){
+  if(!activeCaseId || !db) return;
+  db.collection('mitsumori_cases').doc(activeCaseId).update({
+    status:'sent',
+    sentAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e=>console.error('markCaseSentIfActive error', e));
+}
+
+/* ========================= PC仕上げ 方式B：Claude in Excel 転記用の指示文生成 =========================
+   複雑な既存フォーマットの体裁を崩さず転記できるよう、列文字（A,B,C...）とセル位置を
+   決定的な文字列組み立てだけで求める（AIには一切通さない。セル座標の正確性が命の機能に
+   幻覚リスクを持ち込まないため）。buildExcelRow()をそのまま再利用し、値の並びだけ流用する。
+========================================================= */
+function columnIndexToLetter(idx){ // 0始まりの列番号 → "A","B",...,"AA"...
+  let s = '';
+  idx += 1;
+  while(idx > 0){
+    const rem = (idx - 1) % 26;
+    s = String.fromCharCode(65+rem) + s;
+    idx = Math.floor((idx-1)/26);
+  }
+  return s;
+}
+function letterToColumnIndex(letters){ // "A"→0, "B"→1 ...
+  let idx = 0;
+  for(let i=0; i<letters.length; i++){
+    idx = idx*26 + (letters.charCodeAt(i)-64);
+  }
+  return idx-1;
+}
+function parseStartCell(startCell){
+  const m = /^([A-Za-z]+)\s*(\d+)$/.exec((startCell||'').trim());
+  if(!m) return { colIdx:0, row:1 }; // 未設定ならA1起点とみなす
+  return { colIdx: letterToColumnIndex(m[1].toUpperCase()), row: Number(m[2]) };
+}
+
+function buildClaudeInstruction(items, t){
+  if(items.length===0) return '（明細がありません）';
+  const { colIdx, row } = parseStartCell(t.startCell);
+  const colLetters = t.columns.map((c,i)=>columnIndexToLetter(colIdx+i));
+  const mapping = t.columns.map((c,i)=>`${colLetters[i]}=${c}`).join(', ');
+  const lines = items.map(it=>buildExcelRow(it, t.columns).join(', '));
+  return [
+    `以下の項目を${colLetters[0]}${row}行目以降に、1項目1行で転記してください。`,
+    `列: ${mapping}（金額は数量×単価で計算）`,
+    ...lines.map((l,i)=>`${i+1}行目: ${l}`)
+  ].join('\n');
+}
+
+document.getElementById('claudeInstructionBtn').addEventListener('click', ()=>{
+  if(estimateItems.length===0){ toast('明細がありません'); return; }
+  const t = templates.find(x=>x.id===selectedTemplateId) || templates[0];
+  const text = buildClaudeInstruction(estimateItems, t);
+  document.getElementById('claudeInstructionText').value = text;
+  document.getElementById('claudeInstructionModal').style.display = 'flex';
+});
+document.getElementById('claudeInstructionCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('claudeInstructionModal').style.display = 'none';
+});
+document.getElementById('claudeInstructionCopyBtn').addEventListener('click', async ()=>{
+  const ta = document.getElementById('claudeInstructionText');
+  ta.select();
+  try{
+    await navigator.clipboard.writeText(ta.value);
+    toast('コピーしました');
+  }catch(e){
+    // クリップボード権限が無い環境向けのフォールバック：選択状態のまま手動コピーしてもらう
+    toast('自動コピーできませんでした。選択された文章を手動でコピーしてください');
+  }
 });
 
 document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
