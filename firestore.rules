@@ -16,6 +16,12 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.isAdmin == true;
     }
+    function isMitsumoriActive() {
+      return isAuth() && (
+        !exists(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/mitsumori_users/$(request.auth.uid)).data.hidden != true
+      );
+    }
 
     match /users/{uid} {
       allow read: if isAuth();
@@ -233,16 +239,25 @@ service cloud.firestore {
       allow delete: if isMitsumoriAdmin();
     }
     match /mitsumori_price_master/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if isMitsumoriActive();
     }
     match /mitsumori_catalog_items/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if isMitsumoriActive();
     }
     match /mitsumori_templates/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if isMitsumoriActive();
     }
     match /mitsumori_history/{docId} {
-      allow read, create: if isAuth();
+      allow read, create: if isMitsumoriActive();
+    }
+    // ══ NEW: MITUMORI v2（案件管理） ══
+    // 閲覧は全アクティブユーザー可（案件一覧・カンバンで全体を見渡せるようにする）。
+    // 編集は作成者本人か管理者のみ（他人の案件を誤って書き換えられないようにする）。
+    match /mitsumori_cases/{caseId} {
+      allow read: if isMitsumoriActive();
+      allow create: if isMitsumoriActive() && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isMitsumoriActive() &&
+        (resource.data.ownerUid == request.auth.uid || isMitsumoriAdmin());
     }
 
     match /{document=**} {
