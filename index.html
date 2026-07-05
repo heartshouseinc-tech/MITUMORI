@@ -767,6 +767,7 @@ function renderCaseTile(c){
     actions += `<button onclick="event.stopPropagation(); updateCaseStatus('${c.id}','lost')">失注</button>`;
   }
   actions += `<button onclick="event.stopPropagation(); duplicateCase('${c.id}')">複製</button>`;
+  actions += `<button onclick="event.stopPropagation(); deleteCaseConfirm('${c.id}')">削除</button>`;
   return `
     <div class="case-tile" onclick="openCase('${c.id}', false)">
       <div class="c-name">${escapeHtml(c.project||'（案件名未入力）')}${modeBadge}${statusBadge}</div>
@@ -793,6 +794,18 @@ async function updateCaseStatus(caseId, status){
   }catch(e){
     console.error(e);
     toast('ステータス更新に失敗しました（他人の案件は管理者のみ操作できます）');
+  }
+}
+
+async function deleteCaseConfirm(caseId){
+  if(!db) return;
+  if(!confirm('この案件を削除しますか？この操作は取り消せません')) return;
+  try{
+    await db.collection('mitsumori_cases').doc(caseId).delete();
+    toast('案件を削除しました');
+  }catch(e){
+    console.error(e);
+    toast('削除に失敗しました（他人の案件は管理者のみ削除できます）');
   }
 }
 
